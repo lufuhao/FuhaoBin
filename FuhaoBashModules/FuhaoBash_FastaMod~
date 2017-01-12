@@ -1,0 +1,43 @@
+#!/bin/bash
+### bash modules
+###Descriptions:
+#	Fasta related subfunctions
+
+
+
+#Author:
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+### ExtractFasta (in.fa, in.ids, out.fa)
+### Description: Extract and index Fasta subset
+### Require: seqextract_samtools.pl
+### Note: 
+ExtractFasta () {
+
+	local EFfastadb=$1;
+	local EFfastaid=$2;
+	local EFfastaout=$3;
+	local EFsubinfo='SUBFT(ExtractFasta)';
+	
+	seqextract_samtools.pl $EFfastadb $EFfastaid $EFfastaout
+	if [ $? -ne 0 ] || [ ! -s $EFfastaout ]; then
+		echo ${EFsubinfo} "Error: seqextract_samtools.pl" >&2
+		echo "CMD used: seqextract_samtools.pl $EFfastadb $EFfastaid $EFfastaout" >&2
+		return 1;
+	fi
+	
+	EFnumid=$(wc -l < $EFfastaid)
+	EFnumout=$(grep ^'>' $EFfastaout | wc -l)
+	
+	if [ $EFnumid -ne $EFnumout ]; then
+	
+	fi
+	
+	re
+}

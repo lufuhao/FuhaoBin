@@ -1,0 +1,54 @@
+#!/bin/bash
+### bash modules
+###Descriptions:
+#	cmd related subfunctions
+
+
+
+#Author:
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+###Detect command existence
+CmdExists () {
+  if command -v $1 >/dev/null 2>&1; then
+    echo 0
+  else
+#    echo "I require $1 but it's not installed.  Aborting." >&2
+    echo 1
+  fi
+#  local cmd=$1
+#  if command -v $cmd >/dev/null 2>&1;then
+#    echo >&2 $cmd "  :  "`command -v $cmd`
+#    exit 0
+#  else
+#    echo >&2 "Error: require $cmd but it's not installed.  Exiting..."
+#    exit 1
+#  fi
+}
+###Example:
+#if [ $(CmdExists 'sanmtools') -eq 0 ]; then
+#	exit 0
+#else
+#	echo "Error: CMD/script 'samtools' in PROGRAM 'SAMtools' is required but not found.  Aborting..." >&2
+#	exit 127
+#fi
+#if [ $(CmdExists 'santools') -eq 1 ]; then
+#	echo "Error: CMD/script 'samtools' in PROGRAM 'SAMtools' is required but not found.  Aborting..." >&2 
+#	exit 127
+#fi
+
+
+###Detect command existence
+CmdExists () {
+  if command -v $1 >/dev/null 2>&1; then
+    return 0
+  else
+    return 1
+  fi
+}

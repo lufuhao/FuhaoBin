@@ -1,0 +1,82 @@
+#!/bin/bash
+### bash modules
+### Descriptions:
+#	BAM related subfunctions
+
+
+
+#Author:
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+### BowtieMappingSingle(index, fq, option, outbam)
+### Description: mapping single end to bowtie index using bowtie
+BowtieMappingSingle () {
+	local BMSindex=$1;
+	local BMSfq=$2
+	local BMSoptions=$3;
+	local BMSbamout=$4;
+	local BMSsubinfo='BowtieMappingSingle';
+	bowtie $BMSoptions $BMSindex $BMSfq  | samtools view -b -h -S -F 4 - > $BMSbamout.notsort.bam
+	if [ $? -ne 0 ] || [ ! -s $BMSbamout.notsort.bam ]; then
+		echo "${BMSsubinfo}Error: bowtie running failed" >&2
+		echo "CMD used: bowtie $BMSoptions $BMSindex $BMSfq  | samtools view -b -h -S -F 4 - > $BMSbamout.notsort.bam" >&2
+		return 1;
+	fi
+	samtools sort -f $BMSbamout.notsort.bam $BMSbamout
+	if [ $? -ne 0 ] || [ ! -s $BMSbamout ]; then
+		echo "${BMSsubinfo}Error: samtools sort running failed" >&2
+		echo "CMD used: samtools sort -f $BMSbamout.notsort.bam $BMSbamout" >&2
+		return 1;
+	else
+		rm $BMSbamout.notsort.bam;
+	fi
+	samtools index $BMSbamout
+	if [ $? -ne 0 ] || [ ! -s "$BMSbamout.bai" ]; then
+		echo "${BMSsubinfo}Error: samtools index running failed" >&2
+		echo "CMD used: samtools index $BMSbamout" >&2
+		return 1;
+	fi
+	return 0;
+}
+
+
+
+### Run lastal and maf-convert
+### RunLastal query.fasta lastdb_index output.psl
+### Global:
+RunLastal () {
+	local RLquery=$1
+	local RLindex=$2
+	local RLoutput=$3
+	local RLlastaloption=$4
+	local RLsubinfo="SH(RunLastal)"
+	
+	lastal $RLlastaloption $lastdb_index $RLquery > $RLquery.maf
+	if [ $? -ne 0 ]; then
+		echo "${RLsubinfo}Error: lastal running failed" >&2
+		echo "CMD used: lastal $RLlastaloption $lastdb_index $RLquery > $RLquery.maf" >&2
+		return 1;
+	elif [ ! -s "$RLquery.maf" ]; then
+		echo "${RLsubinfo}Error: lastal output failed" >&2
+		echo "CMD used: lastal $RLlastaloption $lastdb_index $RLquery > $RLquery.maf" >&2
+		return 1;
+	fi
+	maf-convert psl $RLquery.maf > $RLoutput
+	if [ $? -ne 0 ]; then
+		echo "${RLsubinfo}Error: maf2psl running failed" >&2
+		echo "CMD used: maf-convert psl $RLquery.maf > $RLoutput" >&2
+		return 1;
+	elif [ ! -s "$RLoutput" ]; then
+		echo "${RLsubinfo}Error: maf2psl output failed" >&2
+		echo "CMD used: maf-convert psl $RLquery.maf > $RLoutput" >&2
+		return 1;
+	fi
+	rm $RLquery.maf  > /dev/null 2>&1
+	return 0;
+}

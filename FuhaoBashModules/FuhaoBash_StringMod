@@ -1,0 +1,33 @@
+#!/bin/bash
+### bash modules
+###Descriptions:
+#	String/list related subfunctions
+
+
+
+#Author:
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+###Usage: array=(`split delimiter string`)
+split () {
+	local separator=$1
+	local mystring=$2
+	echo $mystring | sed -e "s/$separator/\n/g"
+}
+
+
+#Usage: string=$(join delimiter array)
+join () {
+        local separator=$1
+        shift 1
+        local -a array=(`echo $@`)
+        local returnstr=$(printf "$separator%s" "${array[@]}")
+        returnstr=${returnstr:1}
+        echo $returnstr
+}
