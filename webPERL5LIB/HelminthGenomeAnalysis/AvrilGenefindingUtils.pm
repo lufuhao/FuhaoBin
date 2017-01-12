@@ -1,0 +1,279 @@
+package HelminthGenomeAnalysis::AvrilGenefindingUtils;
+ 
+use strict;
+use warnings;
+use Bio::Seq;
+use Bio::SeqIO;
+use Moose;
+use Math::Round; # HAS THE nearest() FUNCTION
+use Carp::Assert; # HAS THE assert() FUNCTION 
+use Scalar::Util qw(looks_like_number);
+use Math::Round; # CONTAINS FUNCTION nearest() FOR ROUNDING
+ 
+use base 'Exporter';
+our @EXPORT_OK = qw( make_exonerate_hints read_eval_stats );
+ 
+#------------------------------------------------------------------#
+ 
+# SUBROUTINE SYNOPSIS: make_exonerate_hints(): GIVEN AN EXONERATE GFF FILE, MAKE A HINTS FILE FOR AUGUSTUS (NOTE: THE HINTS ARE GIVEN PRIORITY 4):
+# NOTE: /nfs/users/nfs_a/alc/Documents/bin/augustus/scripts/blat2hints.pl COMES WITH AUGUSTUS AND CONVERTS A BLAT FILE (OF mRNA/EST ALIGNMENTS)
+# TO A HINTS FILE, AND CUTS 10 bp OFF EACH END OF THE ALIGNMENT TO MAKE THE exonpart HINT. 
+# THE SCRIPT /nfs/users/nfs_a/alc/Documents/bin/augustus/scripts/exonerate2hints.pl COMES WITH AUGUSTUS AND CONVERTS AN exonerate OUTPUT FILE
+# TO A HINTS FILE, AND CUTS 9 bp OFF EACH END OF EACH exonerate CDS TO MAKE CDSpart HINTS.
+ 
+sub make_exonerate_hints
+{
+   my $input_gff             = $_[0]; # EXONERATE GFF FILE
+   my $hints_file            = $_[1]; # OUTPUT HINTS FILE
+   my $type                  = $_[2]; # TYPE OF EXONERATE ALIGNMENT ('est'/'prot')
+   my $minintronlen          = $_[3]; # MINIMUM INTRON LENGTH 
+   my $maxintronlen          = $_[4]; # MAXIMUM INTRON LENGTH 
+   my $CDSpart_cutoff        = $_[5]; # NUMBER OF BASE-PAIRS TO CUT OFF EACH exonerate CDS/exon TO MAKE CDSpart/exonpart HINTS.
+   my $line;                          # 
+   my @temp;                          # 
+   my $scaffold;                      # SCAFFOLD NAME
+   my $feature_type;                  # FEATURE TYPE
+   my $start;                         # FEATURE START
+   my $end;                           # FEATURE END
+   my $strand;                        # FEATURE STRAND 
+   my $score;                         # FEATURE SCORE
+   my $gene;                          # GENE NAME
+   my $name;                          # FEATURE NAME
+   my $input_gff_file;                # NAME OF THE INPUT GFF FILE 
+   my $intronlen;                     # INTRON LENGTH
+   my $tmp;                           # VARIABLE FOR STORING TEMPORARY VALUE 
+   
+   # CHECK THAT $type IS 'prot' OR 'est':
+   throw Error::Simple("ERRORCODE=2: make_exonerate_hints: type $type - should be prot/est") if ($type ne 'prot' && $type ne 'est'); # TESTED FOR
+ 
+   # FIND THE NAME OF THE INPUT GFF FILE:
+   @temp                     = split(/\//,$input_gff);
+   $input_gff_file           = $temp[$#temp];
+ 
+   # OPEN THE OUTPUT FILE:
+   open(HINTSFILE,">$hints_file") || die "ERROR: make_exonerate_hints: cannot open $hints_file\n";
+ 
+   # READ IN THE INPUT GFF FILE:
+   open(INPUT_GFF,"$input_gff") || die "ERROR: make_exonerate_hints: cannot open $input_gff\n";
+   while(<INPUT_GFF>) {
+      $line                  = $_;
+      chomp $line;
+      @temp                  = split(/\t+/,$line);
+      # THROW AN ERROR IF THERE ARE NOT 9 COLUMNS:
+      throw Error::Simple("ERRORCODE=1: make_exonerate_hints: gff $input_gff does not have 9 columns") if (scalar(@temp) < 8); # TESTED FOR
+ 
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  gene    610226  611381  1295    +       .       ID=gene1;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  CDS     610226  610399  .       +       .       ID=gene1:cds;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  exon    610226  610399  .       +       .       ID=gene1:exon:1;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  splice5 610400  610401  .       +       .       ID=gene1:splice5;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  intron  610400  610445  .       +       .       ID=gene1:intron;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  splice3 610444  610445  .       +       .       ID=gene1:splice3;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  CDS     610446  610521  .       +       .       ID=gene1:cds;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  exon    610446  610521  .       +       .       ID=gene1:exon:2;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  splice5 610522  610523  .       +       .       ID=gene1:splice5;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  intron  610522  610623  .       +       .       ID=gene1:intron;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  splice3 610622  610623  .       +       .       ID=gene1:splice3;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  CDS     610624  611381  .       +       .       ID=gene1:cds;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  exon    610624  611381  .       +       .       ID=gene1:exon:3;Parent=gene1
+      # PTRK_scaffold1_size6144505      exonerate:protein2genome:local  similarity      610226  611381  1295    +       .       alignment_id 0 ; Query SRAE_2000311000.t1:mRNA ; Align 24781 1 108 ; Align 24895 37 60 ; Align 25001 57 75 ; Align 25181 83 756
+      $scaffold              = $temp[0];
+      $feature_type          = $temp[2];
+      $start                 = $temp[3];
+      $end                   = $temp[4];
+      if ($feature_type eq 'CDS' || $feature_type eq 'exon' || $feature_type eq 'intron') {
+         # $start SHOULD BE BEFORE $end:
+         assert($start <= $end);
+         $score              = $temp[5];
+         $strand             = $temp[6];
+         $name               = $temp[8];
+         # GET THE GENE NAME:
+         @temp               = split(/Parent=/,$name);
+         $gene               = $temp[1]; # eg. gene1  
+         $gene               = $input_gff_file."_".$gene;
+         if    ($feature_type eq 'CDS') # CODING EXON
+         {
+            # IF IT IS A PROTEIN ALIGNMENT, WE WANT TO USE THE CODING EXONS AS 'CDSpart' HINTS:
+            if ($type eq 'prot')
+            {
+               $start        = $start + $CDSpart_cutoff;
+               $end          = $end - $CDSpart_cutoff;
+               if ($start > $end)
+               {
+                  $tmp       = int(($start + $end)/2);
+                  $start     = $tmp;
+                  $end       = $tmp;
+               }
+               print HINTSFILE "$scaffold\texoneratehints\tCDSpart\t$start\t$end\t.\t$strand\t.\tgroup=$gene; source=P; priority=4\n"; 
+            }
+         }
+         elsif ($feature_type eq 'exon') # EXON
+         {
+            # IF IT IS AN EST ALIGNMENT, WE WANT TO USE THE 'exon' FEATURES AS 'exonpart' HINTS:
+            if ($type eq 'est')
+            {
+               $start        = $start + $CDSpart_cutoff;
+               $end          = $end - $CDSpart_cutoff;
+               if ($start > $end)
+               {
+                  $tmp       = int(($start + $end)/2);
+                  $start     = $tmp;
+                  $end       = $tmp;
+               }
+               print HINTSFILE "$scaffold\texoneratehints\texonpart\t$start\t$end\t.\t$strand\t.\tgroup=$gene; source=E; priority=4\n"; 
+            }
+         }
+         elsif ($feature_type eq 'intron') # INTRON
+         {
+            $intronlen       = $end - $start + 1;
+            if ($intronlen >= $minintronlen && $intronlen <= $maxintronlen)
+            {
+               # IF IT IS A PROTEIN OR EST ALIGNMENT, WE WANT TO USE THE INTRONS AS 'intron' HINTS:
+               if    ($type eq 'prot')
+               {
+                  print HINTSFILE "$scaffold\texoneratehints\tintron\t$start\t$end\t0\t$strand\t.\tgroup=$gene; source=P; priority=4\n"; 
+               }
+               elsif ($type eq 'est')
+               {
+                  print HINTSFILE "$scaffold\texoneratehints\tintron\t$start\t$end\t0\t$strand\t.\tgroup=$gene; source=E; priority=4\n"; 
+               }
+            }
+         }
+      }
+   }
+   close(INPUT_GFF); 
+   close(HINTSFILE); 
+ 
+   return(1);
+}
+ 
+#------------------------------------------------------------------#
+ 
+# SUBROUTINE SYNOPSIS: read_eval_stats: GIVEN AN EVAL OUTPUT FILE, RETURN A LOT OF STATISTICS:
+ 
+sub read_eval_stats
+{
+   my $eval_file             = $_[0]; # EVAL FILE
+   my $num_genes             = -1;    # NUMBER OF GENES
+   my $num_transcripts       = -1;    # NUMBER OF TRANSCRIPTS
+   my $av_prot_len           = -1;    # AVERAGE PROTEIN LENGTH IN AMINO ACIDS
+   my $av_exon_len           = -1;    # AVERAGE EXON LENGTH IN BASE-PAIRS
+   my $median_exon_len       = -1;    # MEDIAN EXON LENGTH IN BASE-PAIRS
+   my $av_exons              = -1;    # AVERAGE EXONS PER TRANSCRIPT 
+   my $median_exons          = -1;    # MEDIAN EXONS PER TRANSCRIPT
+   my $av_intron_len         = -1;    # AVERAGE INTRON LENGTH
+   my $median_intron_len     = -1;    # MEDIAN INTRON LENGTH
+   my $proteome_len          = -1;    # PROTEOME LENGTH IN AMINO ACIDS
+   my $line;                          # 
+   my @temp;                          #  
+   my $type                  = "NA";  # TYPE OF FEATURE 
+   my $subtype               = "NA";  # SUBTYPE OF FEATURE
+ 
+   open(EVAL,"$eval_file") || die "ERROR: read_eval_stats: cannot open $eval_file\n";
+   while(<EVAL>)
+   {
+      $line                  = $_;
+      chomp $line;
+      @temp                  = split(/\s+/,$line);
+      if    (substr($line,0,4) eq 'Gene')        { $type = 'Gene';      }
+      elsif (substr($line,0,10) eq 'Transcript') { $type = 'Transcript';}
+      elsif (substr($line,0,4) eq 'Exon')        { $type = 'Exon';      }
+      elsif (substr($line,0,3) eq 'Nuc')         { $type = 'Nuc';       }
+      elsif (substr($line,0,6) eq 'Signal')      { $type = 'Signal';    }
+      # GET THE NUMBER OF GENES AND TRANSCRIPTS:
+      if ($type eq 'Gene')
+      {
+         #   	Count                         	27189.00
+         if ($line =~ /Count/) 
+         {  
+            assert($num_genes == -1);
+            $num_genes       = $temp[$#temp];
+         }
+         #		Total Transcripts             	27189.00
+         if ($line =~ /Total Transcripts/) 
+         { 
+            assert($num_transcripts == -1);
+            $num_transcripts = $temp[$#temp];
+         }   
+      }
+      # GET THE AVERAGE PROTEIN LENGTH, AND TOTAL PROTEOME LENGTH, AND AVERAGE AND MEDIAN EXONS PER GENE:
+      if ($type eq 'Transcript')
+      {
+         if    ($line =~ /All/)             { $subtype = 'All';            }
+         elsif ($line =~ /Complete/)        { $subtype = 'Complete';       }
+         # 		Average Coding Length                	2135.66
+         if ($line =~ /Average Coding Length/ && $subtype eq 'All') 
+         { 
+            assert($av_prot_len == -1);
+            $av_prot_len     = $temp[$#temp] / 3; # DIVIDE BY 3 TO GET AMINO ACIDS
+            $av_prot_len     = nearest(0.01, $av_prot_len);
+         }
+         #		Total Coding Length           	14689651.00
+         if ($line =~ /Total Coding Length/ && $subtype eq 'All') 
+         { 
+            assert($proteome_len == -1);
+            $proteome_len    = $temp[$#temp] / 3; # DIVIDE BY 3 TO GET AMINO ACIDS
+            $proteome_len    = nearest(0.01, $proteome_len);
+         }
+         #		Ave Exons Per                 	3.31
+         if ($line =~ /Ave Exons Per/ && $subtype eq 'All') 
+         { 
+            assert($av_exons == -1);
+            $av_exons        = $temp[$#temp]; 
+         }
+         #		Med Exons Per                 	3.00
+         if ($line =~ /Med Exons Per/ && $subtype eq 'All') 
+         { 
+            assert($median_exons == -1);
+            $median_exons    = $temp[$#temp]; 
+         }
+      }
+      # GET THE AVERAGE EXON LENGTH, MEDIAN EXON LENGTH, AND AVERAGE AND MEDIAN INTRON LENGTH:
+      if ($type eq 'Exon')
+      {
+         if    ($line =~ /All/)             { $subtype = 'All';            }
+         elsif ($line =~ /Initial/)         { $subtype = 'Initial';        }
+         elsif ($line =~ /Intron/)          { $subtype = 'Intron';         }
+         elsif ($line =~ /InframeOptional/) { $subtype = 'InframeOptional';}
+         # 		Average Length                	163.56
+         if ($line =~ /Average Length/ && $subtype eq 'All') 
+         { 
+            assert($av_exon_len == -1);
+            $av_exon_len     = $temp[$#temp];  # IN BASE-PAIRS
+         }
+         # 		Median Length                 	145.00
+         if ($line =~ /Median Length/ && $subtype eq 'All') 
+         { 
+            assert($median_exon_len == -1);
+            $median_exon_len = $temp[$#temp]; # IN BASE-PAIRS
+         }
+         # 		Average Length                	683.62 
+         if ($line =~ /Average Length/ && $subtype eq 'Intron') 
+         { 
+            assert($av_intron_len == -1);
+            $av_intron_len   = $temp[$#temp]; 
+         }
+         # 		Median Length                 	520.00
+         if ($line =~ /Median Length/ && $subtype eq 'Intron') 
+         { 
+            assert($median_intron_len == -1);
+            $median_intron_len = $temp[$#temp]; 
+         }
+      } 
+   }
+   close(EVAL);
+   assert(looks_like_number($num_genes)); assert($num_genes != -1); 
+   assert(looks_like_number($num_transcripts)); assert($num_transcripts != -1);
+   assert(looks_like_number($av_prot_len)); assert($av_prot_len != -1); 
+   assert(looks_like_number($av_exon_len)); assert($av_exon_len != -1); 
+   assert(looks_like_number($median_exon_len)); assert($median_exon_len != -1); 
+   assert(looks_like_number($av_exons)); assert($av_exons != -1); 
+   assert(looks_like_number($median_exons)); assert($median_exons != -1); 
+   assert(looks_like_number($av_intron_len)); assert($av_intron_len != -1); 
+   assert(looks_like_number($median_intron_len)); assert($median_intron_len != -1); 
+   assert(looks_like_number($proteome_len)); assert($proteome_len != -1); 
+ 
+   return($num_genes,$num_transcripts,$av_prot_len,$av_exon_len,$median_exon_len,$av_exons,$median_exons,$av_intron_len,$median_intron_len,$proteome_len);   
+}
+ 
+#------------------------------------------------------------------#
+1;
