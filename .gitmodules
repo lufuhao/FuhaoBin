@@ -1,0 +1,3 @@
+[submodule "FuhaoPERL5LIB/FuhaoPerl5Lib"]
+	path = FuhaoPERL5LIB/FuhaoPerl5Lib
+	url = git@github.com:lufuhao/FuhaoPerl5Lib.git
