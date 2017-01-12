@@ -1,0 +1,2 @@
+
+(gedit:4248): Gtk-WARNING **: Theme parsing error: gtk.css:23:20: Not using units is deprecated. Assuming 'px'.
