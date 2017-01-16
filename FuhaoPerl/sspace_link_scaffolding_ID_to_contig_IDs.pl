@@ -12,7 +12,7 @@ Links scaffold ID by SSPACE to its's previous original contigs IDs
 	outputprefix
 
 
-v20161031
+v20161222
 
 EOH
 die USAGE if (scalar(@ARGV) !=3 or $ARGV[0] eq '-h' or $ARGV[0] eq '--help');
@@ -51,7 +51,7 @@ while (my $line=<IDCONVERSION>) {
 }
 close IDCONVERSION;
 print "\n\n\nSUMMARY: total conversion.seqid line: $linenum\nTotal hash: ", scalar(keys %idhash), "\n\n";
-#map {print $_, "\n";} keys %idhash;
+#map {print $_, "\n";} keys %idhash; ### For test ###
 
 
 
@@ -95,9 +95,11 @@ while (my $line=<EVIDENCE>) {
 		if (scalar(@arr)>1) {
 			print OUTPUT "$scaffoldid";#, join ("\t", @arr), "\n";
 			print SCAFFOLD "$scaffoldid\n";#, join ("\t", @arr), "\n";
+			my @arr2=();
 			foreach my $id (@arr) {
 				if (exists $idhash{"contig$id"}) {
 					print OUTPUT "\t", $idhash{"contig$id"};
+					print CONTIG $idhash{"contig$id"}, "\n";
 				}
 				else {
 					die "Error: seqID contig$id do not have converted name\n";
@@ -105,7 +107,6 @@ while (my $line=<EVIDENCE>) {
 				$total_scaffolded++;
 			}
 			print OUTPUT "\n";
-			print CONTIG join ("\t", @arr), "\n";
 		}
 		$scaffoldid='';
 		@arr=();
