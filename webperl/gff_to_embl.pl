@@ -116,8 +116,7 @@ print STDERR "FINISHED.\n";
 
 # RUN THE MAIN PART OF THE CODE:
 
-sub run_main_program
-{
+sub run_main_program {
    my $outputdir           = $_[0]; # DIRECTORY TO PUT OUTPUT FILES IN.
    my $gff                 = $_[1]; # THE INPUT GFF FILE
    my $fasta               = $_[2]; # THE INPUT GENOME FASTA FILE   
@@ -153,8 +152,7 @@ sub run_main_program
 
 # TEST &read_gene_positions
 
-sub test_read_gene_positions
-{
+sub test_read_gene_positions {
    my $outputdir           = $_[0]; # DIRECTORY TO WRITE OUTPUT FILES IN
    my $errorcode;                   # RETURNED AS 0 FROM A FUNCTION IF THERE IS NO ERROR
    my $errormsg;                    # RETURNED AS 'none' FROM A FUNCTION IF THERE IS NO ERROR
@@ -165,7 +163,7 @@ sub test_read_gene_positions
    ($gff,$errorcode,$errormsg) = &make_filename($outputdir);
    if ($errorcode != 0) { ($errorcode,$errormsg) = &print_error($errormsg,$errorcode,0); } 
    open(GFF,">$gff") || die "ERROR: test_read_gene_positions: cannot open $gff\n";
-   print GFF "Ratt_Curated.Sratti_scf00001_Chr00    RATT	gene	676104	677702	.	+	.	ID=ratti_train3\n";
+   print GFF "Ratt_Curated.Sratti_scf00001_Chr00	RATT	gene	676104	677702	.	+	.	ID=ratti_train3\n";
    print GFF "Ratt_Curated.Sratti_scf00001_Chr00	RATT	mRNA	676104	677702	.	+	.	ID=ratti_train3;Parent=ratti_train3\n";
    print GFF "Ratt_Curated.Sratti_scf00001_Chr00	RATT	CDS	676104	676526	.	+	.	ID=ratti_train3:exon:1;Parent=ratti_train3\n";
    print GFF "Ratt_Curated.Sratti_scf00001_Chr00	RATT	CDS	676766	677515	.	+	.	ID=ratti_train3:exon:2;Parent=ratti_train3\n";
@@ -521,33 +519,26 @@ sub read_gene_positions
          $end              = $temp[4];
          $score            = $temp[5];
          $strand           = $temp[6];
-         if    ($feature eq 'gene')
-         {
+         if    ($feature eq 'gene') {
             # FIND THE GENE NAME:
             $name          = $temp[8];
-            if ($exonerate eq 'yes')
-            {
+            if ($exonerate eq 'yes') {
                @temp       = split(/sequence\s/,$name);  # eg. gene_id 0 ; sequence PTC00487_1 ; gene_orientation +
                $name       = $temp[1]; 
                @temp       = split(/\s+/,$name);
                $name       = $temp[0];                   # eg. PTC00487_1
             }
-            else
-            {
-               if ($name =~ /ID=/)
-               {
+            else {
+               if ($name =~ /ID=/) {
                   @temp    = split(/ID=/, $name); # eg. ID=ratti_train414
                   $name    = $temp[1];            # eg. ratti_train414 
                }
             }
-            if ($augustus ne 'yes')
-            {
-               if (!($GENES{$scaffold}))
-               {
+            if ($augustus ne 'yes') {
+               if (!($GENES{$scaffold})) {
                   $GENES{$scaffold} = $name;
                }
-               else
-               {
+               else {
                   $GENES{$scaffold} = $GENES{$scaffold}.",".$name;
                }
             }
@@ -555,8 +546,7 @@ sub read_gene_positions
          elsif ($feature eq 'CDS' || $feature eq 'cds' || $feature eq 'First' || $feature eq 'Internal' || $feature eq 'Terminal' || $feature eq 'Single')
          # exonerate USES 'cds', cegma 'First'/'Terminal'/'Internal'/'Single'
          {
-            if ($cegma eq 'yes') 
-            {    
+            if ($cegma eq 'yes') {
                $name       = $temp[8];
                if (!($SEEN{$name}))
                {
@@ -571,8 +561,7 @@ sub read_gene_positions
                   $SEEN{$name} = 1;
                }
             }
-            elsif ($augustus eq 'yes')
-            {
+            elsif ($augustus eq 'yes') {
                # eg. transcript_id "g1.t1"; gene_id "g1";
                $name       = $temp[8];
                @temp       = split(/transcript_id/,$name);
@@ -580,40 +569,33 @@ sub read_gene_positions
                @temp       = split(/\"/,$name);
                $name       = $temp[1]; # g1.t1
                # PUT EACH TRANSCRIPT OF THE GENE AS A SEPARATE GENE IN THE EMBL FILE, SO THAT THEY WILL BE SEEN AS SEPARATE GENES BY ARTEMIS:
-               if (!($SEEN{$name}))
-               {
-                  if (!($GENES{$scaffold}))
-                  {
+               if (!($SEEN{$name})) {
+                  if (!($GENES{$scaffold})) {
                      $GENES{$scaffold} = $name;
                   }
-                  else
-                  {
+                  else {
                     $GENES{$scaffold} = $GENES{$scaffold}.",".$name;
                   }
                   $SEEN{$name} = 1;
                }
             }
-            elsif ($ratt eq 'yes')
-            {
+            elsif ($ratt eq 'yes') {
                $name       = $temp[8];
                @temp       = split(/\;Parent=/,$name); # eg. ratti_train155_1_0;Parent=ratti_train155_1_mRNA
                $name       = $temp[1];                 # eg. ratti_train155_1_mRNA
                @temp       = split(/\_mRNA/,$name);     
                $name       = $temp[0];                 # eg. ratti_train155_1
             }
-            if ($name eq 'none')
-            {
+            if ($name eq 'none') {
                $errormsg   = "ERROR: read_gene_positions: name $name line $line\n";
                $errorcode  = 14; # ERRORCODE=14 (TESTED FOR)
                return(\%GENES,\%EXONS,$errorcode,$errormsg);
             }
             $exon       = $start."=".$end."=".$strand;
-            if (!($EXONS{$name}))
-            {
+            if (!($EXONS{$name})) {
                $EXONS{$name} = $exon;
             }
-            else
-            {
+            else {
                $EXONS{$name} = $EXONS{$name}.",".$exon;
             }
          }
@@ -628,8 +610,7 @@ sub read_gene_positions
 
 # TEST &read_assembly
 
-sub test_read_assembly
-{
+sub test_read_assembly {
    my $outputdir           = $_[0]; # DIRECTORY WHERE WE CAN WRITE OUTPUT FILES
    my $random_number;               # RANDOM NUMBER TO USE IN TEMPORARY FILE NAMES
    my $assembly;                    # TEMPORARY ASSEMBLY FILE NAME 
@@ -653,9 +634,7 @@ sub test_read_assembly
    print ASSEMBLY " AAA AA \n";
    close(ASSEMBLY);
    ($SEQ,$errorcode,$errormsg) = &read_assembly($assembly);
-   if ($SEQ->{'seq1'} ne 'AAAAA' || $SEQ->{'seq2'} ne 'AAAAATTTTT' || $SEQ->{'seq3'} ne 'AAAAATTTTT' || defined($SEQ->{'seq4'}) || 
-       $SEQ->{'seq5'} ne 'AAAAA' || $errorcode != 0) 
-   { 
+   if ($SEQ->{'seq1'} ne 'AAAAA' || $SEQ->{'seq2'} ne 'AAAAATTTTT' || $SEQ->{'seq3'} ne 'AAAAATTTTT' || defined($SEQ->{'seq4'}) || $SEQ->{'seq5'} ne 'AAAAA' || $errorcode != 0) { 
       print STDERR "ERROR: test_read_assembly: failed test1\n"; 
       exit;
    }
@@ -687,7 +666,6 @@ sub test_read_assembly
    ($SEQ,$errorcode,$errormsg) = &read_assembly($assembly);
    if ($errorcode != 5) { print STDERR "ERROR: test_assembly: failed test2\n"; exit;}
    system "rm -f $assembly";
-
 }
 
 #------------------------------------------------------------------#
