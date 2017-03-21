@@ -506,8 +506,7 @@ sub read_gene_positions
    # NOTE: THE GFF FILE HAS A 'gene' FEATURE FIRST FOR THE GENE, AND THIS
    # IS FOLLOWED BY CDS & mRNA FEATURES FOR THE GENE.
    open(GFF,"$gff") || die "ERROR: read_gene_positions: cannot open $gff\n";
-   while(<GFF>)
-   {
+   while(<GFF>) {
       $line                = $_;   
       chomp $line;
       if (substr($line,0,1) ne '#') # IF IT'S NOT A COMMENT LINE
