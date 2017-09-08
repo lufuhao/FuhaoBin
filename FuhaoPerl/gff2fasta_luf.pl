@@ -50,7 +50,7 @@ Options:
         Print current SCRIPT version;
 
 
-v20170321
+v20170526
 
 EOH
 die USAGE unless @ARGV;
@@ -89,10 +89,32 @@ unless (defined $outdir) {
 	$outdir=getcwd;
 	$outdir.='/MyEMBL';
 }
+
 my %outcode=();
 my @outarr=(1,2,3,4);
+### %gene=($geneid => ('reference' => $arr[0],
+###                    'start'     => $arr[3], 
+###                    'end'       => $arr[4],
+###                    'strand'    => $arr[6],
+###                    'score'     => ($arr[5] => $num),
+###                    'Note'      => $note ###Not necessarily exist
+###                    )
+###       )
 my %gene=();
+### %exon=($mrnaid => ('reference' => ($arr[0] => $num),
+###                    'exon' => ({$arr[3]} => ($arr[4] => $exonid))
+###                    'strand'    => $arr[6],
+###                    'score'     => ($arr[5] => $num),
+###                    )
+###       )
 my %exons=();
+### %cds=($mrnaid => ('reference' => ($arr[0] => $num),
+###                   'exon' => ({$arr[3]} => ($arr[4] => $exonid))
+###                   'strand'    => $arr[6],
+###                   'score'     => ($arr[5] => $num),
+###                   'phase'     => ({$arr[3]} => ($arr[4] => $arr[7]))
+###                   )
+###       )
 my %cds=();
 my %referenceids=();
 my %mrnas=();
@@ -108,6 +130,7 @@ unless (defined $stream and $stream=~/^\d+$/ and $stream >= 0) {
 	die "Error: invalid Up/down - stream length\n"
 }
 print "INFO: UpDoanStream options: $stream bp\n";
+### Decide output option
 if (defined $myoptions) {
 	@outarr=split(/,/, $myoptions);
 }
@@ -152,7 +175,7 @@ my $outfile_downstream3000with = Bio::SeqIO->new( -format => 'fasta', -file => "
 unlink "$outprefix.genome.with.updownstream$stream.fasta" if (exists $outcode{'9'} and -e "$outprefix.genome.with.updownstream$stream.fasta");
 my $outfile_updownstream3000with = Bio::SeqIO->new( -format => 'fasta', -file => ">$outprefix.genome.with.updownstream$stream.fasta") if (exists $outcode{'9'});
 
-### 10. 
+### 10. 11.
 if (exists $outcode{'10'} and exists $outcode{'11'}) {
 	die "Error: can not specify options 10 and 11 at the same time\nSeparated running is recommended\n";
 }
@@ -220,13 +243,13 @@ while (my $line=<GFFIN>) {
 		my $parent=$arr[8];
 		$parent=~s/^.*Parent=//; $parent=~s/;.*$//;
 		my @temparr=split(/,/, $parent);
+		$mrnas{$thismrnaid}{'start'}=$arr[3];
+		$mrnas{$thismrnaid}{'end'}=$arr[4];
+		$mrnas{$thismrnaid}{'strand'}{$arr[6]}++;
+		$mrnas{$thismrnaid}{'score'}{$arr[5]}++;
+		$mrnas{$thismrnaid}{'reference'}{$arr[0]}++;
 		foreach my $indpar (@temparr) {
 			$gene2mrna{$indpar}{$thismrnaid}++;
-			$mrnas{$indpar}{'start'}=$arr[3];
-			$mrnas{$indpar}{'end'}=$arr[4];
-			$mrnas{$indpar}{'strand'}{$arr[6]}++;
-			$mrnas{$indpar}{'score'}{$arr[5]}++;
-			$mrnas{$indpar}{'reference'}{$arr[0]}++;
 		}
 	}
 	elsif ($arr[2] =~ /^exon$/i) {
@@ -289,58 +312,78 @@ if (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exis
 		my ($upstart, $upend);
 		my $downstream3000seq='';
 		my ($downstart,$downend);
-		my $updownstream3000seq='';
 		my $seqlength=$db->length("$gene{$idvgene}{'reference'}");
 		my $test_upstream=0;
 		my $test_downstream=0;
 		if ($gene{$idvgene}{'strand'} eq '+') {
 			$geneseq=$db->seq($gene{$idvgene}{'reference'}, $gene{$idvgene}{'start'} => $gene{$idvgene}{'end'});
-			unless ($gene{$idvgene}{'start'}<=1) {
-				$test_upstream=1;
-				$upstart=$gene{$idvgene}{'start'}-$stream;
-				if ($upstart<1) {
-					$upstart=1;
+			if (exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'9'}) {
+				if ($gene{$idvgene}{'start'}>1) {
+					$test_upstream=1;
+					$upstart=$gene{$idvgene}{'start'}-$stream;
+					if ($upstart<1) {
+						$upstart=1;
+					}
+					$upend=$gene{$idvgene}{'start'}-1;
 				}
-				$upend=$gene{$idvgene}{'start'}-1;
-			}
-			unless ($gene{$idvgene}{'end'}>=$seqlength) {
-				$test_downstream=1;
-				$downstart=$gene{$idvgene}{'end'}+1;
-				$downend=$gene{$idvgene}{'end'}+$stream;
-				if ($downend>$seqlength) {
-					$downend=$seqlength;
+				else {
+					die "Error: invalid gene start: GENE $idvgene START: ", $gene{$idvgene}{'start'}, "\n";
+				}
+				if ($test_upstream==1) {
+					$upstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $upstart => $upend);
 				}
 			}
-			if ($test_upstream==1) {
-				$upstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $upstart => $upend);
-			}
-			if ($test_downstream==1) {
-				$downstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $downstart => $downend);
+			if (exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'}) {
+				if ($gene{$idvgene}{'end'}<$seqlength) {
+					$test_downstream=1;
+					$downstart=$gene{$idvgene}{'end'}+1;
+					$downend=$gene{$idvgene}{'end'}+$stream;
+					if ($downend>$seqlength) {
+						$downend=$seqlength;
+					}
+				}
+				else {
+					die "Error: invalid gene end: GENE $idvgene END: ", $gene{$idvgene}{'start'}, "\n";
+				}
+			
+				if ($test_downstream==1) {
+					$downstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $downstart => $downend);
+				}
 			}
 		}
 		elsif ($gene{$idvgene}{'strand'} eq '-') {
 			$geneseq=$db->seq($gene{$idvgene}{'reference'}, $gene{$idvgene}{'end'} => $gene{$idvgene}{'start'});
-			unless ($gene{$idvgene}{'start'}<=1) {
-				$test_downstream=1;
-				$downstart=$gene{$idvgene}{'start'}-$stream;
-				if ($downstart<1) {
-					$downstart=1;
+			if (exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'}) {
+				if ($gene{$idvgene}{'start'}>1) {
+					$test_downstream=1;
+					$downstart=$gene{$idvgene}{'start'}-$stream;
+					if ($downstart<1) {
+						$downstart=1;
+					}
+					$downend=$gene{$idvgene}{'start'}-1;
 				}
-				$downend=$gene{$idvgene}{'start'}-1;
-			}
-			unless ($gene{$idvgene}{'end'}>=$seqlength) {
-				$test_upstream=1;
-				$upstart=$gene{$idvgene}{'end'}+1;
-				$upend=$gene{$idvgene}{'end'}+$stream;
-				if ($upend>$seqlength) {
-					$upend=$seqlength;
+				else {
+					die "Error2: invalid gene start: GENE $idvgene START: ", $gene{$idvgene}{'start'}, "\n";
+				}
+				if ($test_downstream==1) {
+					$downstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $downend => $downstart);
 				}
 			}
-			if ($test_upstream==1) {
-				$upstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $upend => $upstart);
-			}
-			if ($test_downstream==1) {
-				$downstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $downend => $downstart);
+			if (exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'9'}) {
+				if ($gene{$idvgene}{'end'}<$seqlength) {
+					$test_upstream=1;
+					$upstart=$gene{$idvgene}{'end'}+1;
+					$upend=$gene{$idvgene}{'end'}+$stream;
+					if ($upend>$seqlength) {
+						$upend=$seqlength;
+					}
+				}
+				else {
+					die "Error2: invalid gene end: GENE $idvgene END: ", $gene{$idvgene}{'start'}, "\n";
+				}
+				if ($test_upstream==1) {
+					$upstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $upend => $upstart);
+				}
 			}
 		}
 		my $genescore='.';
@@ -353,87 +396,87 @@ if (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exis
 			@tempscore=sort {$b<=>$a} @tempscore;
 			$genescore=$tempscore[0];
 		}
+		unless ($genescore =~/^\d*\.{0,1}\d+$/) {
+			$genescore='.';
+		}
 	### Gene
 	#	print "Info: Write gene: $idvgene\n"; ### For test ###
-		my $geneseqobj = Bio::Seq->new(
-				-seq        => $geneseq,
-				-id         => $idvgene,
-				-display_id => $idvgene,
-				-alphabet   => 'dna',
-				-desc       => "Score $genescore Strand $gene{$idvgene}{'strand'} Note $gene{$idvgene}{'note'}",
-		);
+		my $seqnote="Score $genescore Strand ".$gene{$idvgene}{'strand'};
+		if (exists $gene{$idvgene}{'note'} and $gene{$idvgene}{'note'}=~/\S+/) {
+			$seqnote.=" Note ";
+			$seqnote.=$gene{$idvgene}{'note'};
+		}
+		
 		if (exists $outcode{'1'}) {
+			my $geneseqobj = Bio::Seq->new(
+					-seq        => $geneseq,
+					-id         => $idvgene,
+					-display_id => $idvgene,
+					-alphabet   => 'dna',
+					-desc       => $seqnote
+			);
 			$outfile_gene->write_seq($geneseqobj) || print STDERR "Warnings: write genome $idvgene failed\n";
 		}
-		$updownstream3000seq=$geneseq;
 	### UpStream
 	#	print "Info: write upstream: $idvgene\n"; ### For test ###
-		if ($test_upstream==1) {
+		if (exists $outcode{'5'} or exists $outcode{'6'} and $test_upstream==1) {
 	#		print "Info: write upstream only: $idvgene\n"; ### For test ###
 			my $usonlyseqobj = Bio::Seq->new(
 				-seq        => $upstream3000seq,
 				-id         => $idvgene,
 				-display_id => $idvgene,
 				-alphabet   => 'dna',
-				-desc       => "UpstreamOnly $stream Score $genescore Strand $gene{$idvgene}{'strand'} Note $gene{$idvgene}{'note'}",
+				-desc       => "UpstreamOnly $stream ".$seqnote
 			);
 			if (exists $outcode{'5'}) {
 				$outfile_upstream3000only->write_seq($usonlyseqobj) || print STDERR "Warnings: upstream.only $idvgene failed\n";
 			}
 	#		print "Info: write upstream with: $idvgene\n"; ### For test ###
-			my $tempseq=$upstream3000seq.$geneseq;
 			my $uswithseqobj = Bio::Seq->new(
-				-seq        => $tempseq,
+				-seq        => $upstream3000seq.$geneseq,
 				-id         => $idvgene,
 				-display_id => $idvgene,
 				-alphabet   => 'dna',
-				-desc       => "WithUpstream $stream Score $genescore Strand $gene{$idvgene}{'strand'} Note $gene{$idvgene}{'note'}",
+				-desc       => "WithUpstream $stream ".$seqnote
 			);
 			if (exists $outcode{'6'}) {
 				$outfile_upstream3000with->write_seq($uswithseqobj) || print STDERR "Warnings: upstream.with $idvgene failed\n";
 			}
-			$updownstream3000seq=$upstream3000seq.$updownstream3000seq;
-			$tempseq='';
-			$upstream3000seq='';
 		}
 	### DownStream
 	#	print "Info: write downstream: $idvgene\n"; ### For test ###
-		if ($test_downstream==1) {
+		if (exists $outcode{'7'} or exists $outcode{'8'} and $test_downstream==1) {
 			my $dsonlyseqobj = Bio::Seq->new(
 				-seq        => $downstream3000seq,
 				-id         => $idvgene,
 				-display_id => $idvgene,
 				-alphabet   => 'dna',
-				-desc       => "DownstreamOnly $stream Score $genescore Strand $gene{$idvgene}{'strand'} Note $gene{$idvgene}{'note'}",
+				-desc       => "DownstreamOnly $stream".$seqnote
 			);
 			if (exists $outcode{'7'}) {
 				$outfile_downstream3000only->write_seq($dsonlyseqobj) || print STDERR "Warnings: downstream.only $idvgene failed\n";
 			}
-			my $tempseq=$geneseq.$downstream3000seq;
 			my $dswithseqobj = Bio::Seq->new(
-				-seq        => $tempseq,
+				-seq        => $geneseq.$downstream3000seq,
 				-id         => $idvgene,
 				-display_id => $idvgene,
 				-alphabet   => 'dna',
-				-desc       => "WithUpstream $stream Score $genescore Strand $gene{$idvgene}{'strand'} Note $gene{$idvgene}{'note'}",
+				-desc       => "WithUpstream $stream".$seqnote,
 			);
 			if (exists $outcode{'8'}) {
 				$outfile_downstream3000with->write_seq($dswithseqobj) || print STDERR "Warnings: downstream.with $idvgene failed\n";
 			}
-			$updownstream3000seq.=$downstream3000seq;
-			$tempseq='';
-			$downstream3000seq='';
 		}
 	### UpDownStream
-	#	print "Info: write updownstream: $idvgene\n"; ### For test ###
-		my $udsonlyseqobj = Bio::Seq->new(
-			-seq        => $updownstream3000seq,
-			-id         => $idvgene,
-			-display_id => $idvgene,
-			-alphabet   => 'dna',
-			-desc       => "WithUpDownstream $stream Score $genescore Strand $gene{$idvgene}{'strand'} Note $gene{$idvgene}{'note'}",
-		);
-		if (exists $outcode{'9'}) {
+		if (exists $outcode{'9'} and $test_upstream==1 and $test_downstream==1) {
+	#		print "Info: write updownstream: $idvgene\n"; ### For test ###
+			my $udsonlyseqobj = Bio::Seq->new(
+				-seq        => $upstream3000seq.$geneseq.$downstream3000seq,
+				-id         => $idvgene,
+				-display_id => $idvgene,
+				-alphabet   => 'dna',
+				-desc       => "WithUpDownstream $stream".$seqnote
+			);
 			$outfile_updownstream3000with->write_seq($udsonlyseqobj) || print STDERR "Warnings: up/downstream.with $idvgene failed\n";
 		}
 	}
@@ -508,7 +551,7 @@ if (exists $outcode{'3'}) {
 
 
 ### CDS
-if (exists $outcode{'2'} or exists $outcode{'3'}) {
+if (exists $outcode{'2'} or exists $outcode{'4'}) {
 	print "### 3. Info: output CDS sequences\n";
 	foreach my $indcds (sort keys %cds) {
 		my ($cdsseq, $translateseq)=&getProtein($indcds);
@@ -592,13 +635,13 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 				unless (exists $gene2mrna{$ind_geneid}) {### check if gene got mrna
 					print STDERR "Warnings: GENE $ind_geneid no mRNAs\n";
 				}
-###				Strand: $gene{$ind_geneid}{'strand'}
+				###Strand: $gene{$ind_geneid}{'strand'}
 				unless ($gene{$ind_geneid}{'strand'} =~/^(\+)|(\-)$/) {
 					die "Error: unknown strand GENE $ind_geneid\n";
 				}
 				
 				foreach my $ind_mrnaid (sort keys %{$gene2mrna{$ind_geneid}}) { 
-###					mRNA
+					###mRNA
 					my %uniqueexons=();
 					my $exonidname=$ind_geneid."exon00000001";
 					my ($testoverlap, $exonarr)=&CheckOverlap($exons{$ind_mrnaid}{'exon'});
@@ -631,15 +674,27 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 						next;
 					}
 					&PrintEmbl('FT', 'mRNA', "$mrnastr");
+					&PrintEmbl('FT', '', "/mrna=\"$ind_mrnaid\"");
+#					&PrintEmbl('FT', '', "/note=\"transcript_id=$ind_mrnaid\"");
 					&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
 					@mrnaexons=();
 					###exon
 					foreach my $exonnum (@{$exonarr}) { 
 						if (exists $outcode{'10'}) {
-							&PrintEmbl('FT', 'exon', ${$exonnum}[0].'..'.${$exonnum}[1]);
+							if ($gene{$ind_geneid}{'strand'} eq '+') {
+								&PrintEmbl('FT', 'exon', ${$exonnum}[0].'..'.${$exonnum}[1]);
+							}
+							else {
+								&PrintEmbl('FT', 'exon', 'complement(' . ${$exonnum}[0] . '..' . ${$exonnum}[1].')');
+							}
 						}
 						if (exists $outcode{'11'}) {
-							&PrintEmbl('FT', 'exon', (${$exonnum}[0]-$tobecut).'..'.(${$exonnum}[1]-$tobecut));
+							if ($gene{$ind_geneid}{'strand'} eq '+') {
+								&PrintEmbl('FT', 'exon', (${$exonnum}[0]-$tobecut).'..'.(${$exonnum}[1]-$tobecut));
+							}
+							else {
+								&PrintEmbl('FT', 'exon', 'complement('.(${$exonnum}[0]-$tobecut).'..'.(${$exonnum}[1]-$tobecut).')');
+							}
 						}
 						my $thisexonid='';
 						my $testunique=0;
@@ -655,6 +710,8 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 								}
 							}
 						}
+						&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
+						&PrintEmbl('FT', '', "/mrna=\"$ind_mrnaid\"");
 						&PrintEmbl('FT', '', "/note=\"$thisexonid\"");
 					}
 					###CDS
@@ -686,13 +743,14 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 						}
 						&PrintEmbl('FT', 'CDS', "$cdsstr");
 						&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
-						&PrintEmbl('FT', '', "/protein_id=\"$ind_mrnaid\"");
-						&PrintEmbl('FT', '', "/note=\"transcript_id=$ind_mrnaid\"");
+						&PrintEmbl('FT', '', "/mrna=\"$ind_mrnaid\"");
+#						&PrintEmbl('FT', '', "/protein_id=\"$ind_mrnaid\"");
+#						&PrintEmbl('FT', '', "/note=\"transcript_id=$ind_mrnaid\"");
 
-						my $protseqobj={};
-						my $cdsseqobj={};
-						($cdsseqobj, $protseqobj)=&getProtein($ind_mrnaid);
-						&PrintEmbl('FT', '', '/translation="'. $protseqobj->seq .'"');
+#						my $protseqobj={};
+#						my $cdsseqobj={};
+#						($cdsseqobj, $protseqobj)=&getProtein($ind_mrnaid);
+#						&PrintEmbl('FT', '', '/translation="'. $protseqobj->seq .'"');
 					}
 				}
 				if (exists $outcode{'11'}) {
