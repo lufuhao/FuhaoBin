@@ -42,3 +42,28 @@ ExtractFasta () {
 	
 	return 0;
 }
+
+FastaExtractSeqtk () {
+
+	local EFfastadb=$1;
+	local EFfastaid=$2;
+	local EFfastaout=$3;
+	local EFsubinfo='SUBFT(FastaExtractSeqtk)';
+	
+	seqtk subseq $EFfastadb $EFfastaid > $EFfastaout
+	if [ $? -ne 0 ] || [ ! -s $EFfastaout ]; then
+		echo ${EFsubinfo} "Error: seqtk subseq" >&2
+		echo "CMD used: seqtk subseq $EFfastadb $EFfastaid > $EFfastaout" >&2
+		exit 100;
+	fi
+	
+	EFnumid=$(wc -l < $EFfastaid)
+	EFnumout=$(grep ^'>' $EFfastaout | wc -l)
+	
+	if [ $EFnumid -ne $EFnumout ]; then
+		echo ${EFsubinfo} "Error: number of seqs in output NOT EQUAL number of IDs" >&2
+		exit 100;
+	fi
+	
+	return 0;
+}
