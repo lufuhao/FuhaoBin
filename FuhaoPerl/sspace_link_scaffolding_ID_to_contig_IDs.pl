@@ -11,8 +11,12 @@ Links scaffold ID by SSPACE to its's previous original contigs IDs
 		#Format: Col1:currentnameInFinal.fasta	Col2:previousInFormatted.fasta
 	outputprefix
 
+Output
+	outputprefix
+	outputprefix.contig
+	outputprefix.scaffold
 
-v20161222
+v20170905
 
 EOH
 die USAGE if (scalar(@ARGV) !=3 or $ARGV[0] eq '-h' or $ARGV[0] eq '--help');
