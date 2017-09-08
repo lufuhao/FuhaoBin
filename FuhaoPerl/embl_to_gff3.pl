@@ -35,7 +35,7 @@ my $in = Bio::SeqIO->new(-file=>$emblin,-format=>'EMBL');
 open (OUTGFF3, ">$outgff") || die "Error: can not write GFF3 file: $outgff\n";
 while (my $seq = $in->next_seq) {
 	for my $feat ($seq->top_SeqFeatures) {
-		print $feat->gff_string,"\n";
+		print OUTGFF3 $feat->gff_string,"\n";
 	}
 }
-close $outgff;
+close OUTGFF3;
