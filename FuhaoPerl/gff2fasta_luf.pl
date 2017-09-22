@@ -7,6 +7,7 @@ use Bio::DB::Fasta;
 use Cwd;
 use Data::Dumper qw /Dumper/;
 use FuhaoPerl5Lib::FastaKit qw /Codon2AA/;
+use FuhaoPerl5Lib::GffKit qw /ReadGff3 WriteGff3/;
 use Getopt::Long;
 use constant USAGE =><<EOH;
 
@@ -41,6 +42,8 @@ Options:
              9=genome.with.up/downstream
              10=embl per seq
              11=embl per gene
+             12=genome.with.up/downstream + corresponding GFF
+                Will output 9 and GFF3
           default:1,2,3,4
     --outdir | -d
         Output dir for OUTOPT 10-11; [./MyEMBL]
@@ -50,7 +53,7 @@ Options:
         Print current SCRIPT version;
 
 
-v20170526
+v20170922
 
 EOH
 die USAGE unless @ARGV;
@@ -92,33 +95,13 @@ unless (defined $outdir) {
 
 my %outcode=();
 my @outarr=(1,2,3,4);
-### %gene=($geneid => ('reference' => $arr[0],
-###                    'start'     => $arr[3], 
-###                    'end'       => $arr[4],
-###                    'strand'    => $arr[6],
-###                    'score'     => ($arr[5] => $num),
-###                    'Note'      => $note ###Not necessarily exist
-###                    )
-###       )
-my %gene=();
-### %exon=($mrnaid => ('reference' => ($arr[0] => $num),
-###                    'exon' => ({$arr[3]} => ($arr[4] => $exonid))
-###                    'strand'    => $arr[6],
-###                    'score'     => ($arr[5] => $num),
-###                    )
-###       )
-my %exons=();
-### %cds=($mrnaid => ('reference' => ($arr[0] => $num),
-###                   'exon' => ({$arr[3]} => ($arr[4] => $exonid))
-###                   'strand'    => $arr[6],
-###                   'score'     => ($arr[5] => $num),
-###                   'phase'     => ({$arr[3]} => ($arr[4] => $arr[7]))
-###                   )
-###       )
-my %cds=();
-my %referenceids=();
-my %mrnas=();
-my %gene2mrna=();
+my $cds={};
+my $referenceids={};
+my $mrnas={};
+my $gene={};
+my $gene2mrna=();
+my %mergedregion=();
+my $exons={};
 
 
 
@@ -172,8 +155,8 @@ unlink "$outprefix.genome.with.downstream$stream.fasta" if (exists $outcode{'8'}
 my $outfile_downstream3000with = Bio::SeqIO->new( -format => 'fasta', -file => ">$outprefix.genome.with.downstream$stream.fasta" ) if (exists $outcode{'8'});
 
 ###9. genome.with.up/downstream
-unlink "$outprefix.genome.with.updownstream$stream.fasta" if (exists $outcode{'9'} and -e "$outprefix.genome.with.updownstream$stream.fasta");
-my $outfile_updownstream3000with = Bio::SeqIO->new( -format => 'fasta', -file => ">$outprefix.genome.with.updownstream$stream.fasta") if (exists $outcode{'9'});
+unlink "$outprefix.genome.with.updownstream$stream.fasta" if ((exists $outcode{'9'} or exists $outcode{'12'}) and -e "$outprefix.genome.with.updownstream$stream.fasta");
+my $outfile_updownstream3000with = Bio::SeqIO->new( -format => 'fasta', -file => ">$outprefix.genome.with.updownstream$stream.fasta") if (exists $outcode{'9'} or exists $outcode{'12'});
 
 ### 10. 11.
 if (exists $outcode{'10'} and exists $outcode{'11'}) {
@@ -190,221 +173,231 @@ elsif (exists $outcode{'10'} or exists $outcode{'11'}) {
 		mkdir $outdir, 0766 || die "Error: can not make dir $outdir\n";
 	}
 }
+### 12 . OUTGFF
+my $outputgff3="$outprefix.genome.with.updownstream$stream.gff3" if (exists $outcode{'12'});
+unlink $outputgff3 if (exists $outcode{'12'} and -e $outputgff3);
+
+
 
 
 
 ### Main ############################################################
+(my $test_success, $referenceids, $gene, $gene2mrna, $mrnas, $exons, $cds)=ReadGff3($gffin, $file_fasta);
+unless ($test_success) {
+	die "Error: failed to read GFF3\n";
+}
 
 
 ### Reading GFF3 ####################################################
-print "\n\n\n### Reading GFF3\n";
-open (GFFIN, "< $gffin") || die "Error: can not open GFF input\n";
-while (my $line=<GFFIN>) {
-	chomp $line;
-	next if ($line=~/^#/);
-	my @arr=split(/\t/, $line);
-	unless (scalar(@arr)==9 and $arr[3]=~/^\d+$/ and $arr[4]=~/^\d+$/ and $arr[3]<=$arr[4]) {
-		print STDERR "Error: border error ($.): $line\n";
-		exit 1;
-	}
-	unless (defined $arr[6] and $arr[6]=~/(^\+$)|(^-$)/) {
-		unless ($arr[2]=~/chrom/i) {
-			print STDERR "Error: unknown strand line($.): $line\n" ;
-			exit 1;
-		}
-	}
-	if ($arr[2] =~ /^gene$/i) {
-		next unless (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'} or exists $outcode{'10'} or exists $outcode{'11'});
-		my $thisgeneid=$arr[8];
-		$thisgeneid=~s/^.*ID=//;$thisgeneid=~s/;.*$//;
-		if (exists $gene{$thisgeneid}) {
-			print STDERR "Error: duplicated gene ID: $thisgeneid\n";
-			exit 1;
-		}
-		$referenceids{$arr[0]}{$arr[3]}{$thisgeneid}++;
-		$gene{$thisgeneid}{'reference'}=$arr[0];
-		$gene{$thisgeneid}{'start'}=$arr[3];
-		$gene{$thisgeneid}{'end'}=$arr[4];
-		$gene{$thisgeneid}{'strand'}=$arr[6];
-		$gene{$thisgeneid}{'score'}{$arr[5]}++;
-		if ($arr[8]=~/Note=(\S+)/) {
-			my $notes=$1;
-			$notes=~s/;.*$//;
-			$notes=~s/\s+$//;
-			$notes=~s/^\s+//;
-			$gene{$thisgeneid}{'note'}=$notes;
-		}
-#		print "Test: geneid: $thisgeneid\tgenenote: $gene{$thisgeneid}{'note'}\n"; ### For test ###
-	}
-	elsif ($arr[2] =~ /^mRNA$/i) {
-		next unless (exists $outcode{'10'} or exists $outcode{'11'});
-		my $thismrnaid=$arr[8];
-		$thismrnaid=~s/^.*ID=//; $thismrnaid=~s/;.*$//;
-		my $parent=$arr[8];
-		$parent=~s/^.*Parent=//; $parent=~s/;.*$//;
-		my @temparr=split(/,/, $parent);
-		$mrnas{$thismrnaid}{'start'}=$arr[3];
-		$mrnas{$thismrnaid}{'end'}=$arr[4];
-		$mrnas{$thismrnaid}{'strand'}{$arr[6]}++;
-		$mrnas{$thismrnaid}{'score'}{$arr[5]}++;
-		$mrnas{$thismrnaid}{'reference'}{$arr[0]}++;
-		foreach my $indpar (@temparr) {
-			$gene2mrna{$indpar}{$thismrnaid}++;
-		}
-	}
-	elsif ($arr[2] =~ /^exon$/i) {
-		next unless (exists $outcode{'3'} or exists $outcode{'10'} or exists $outcode{'11'});
-		my $parent=$arr[8];
-		$parent=~s/^.*Parent=//; $parent=~s/;.*$//;
-#		print "Test: exon $arr[3]-$arr[4] \tParent: $parent\n"; ### For test ###
-		my @temparr=split(/,/, $parent);
-		my $exonid=$arr[8];
-		$exonid=~s/^.*ID=//; $exonid=~s/;.*$//;
-		foreach my $indpar (@temparr) {
-			if (exists $exons{$indpar} and exists $exons{$indpar}{'exon'} and exists $exons{$indpar}{'exon'}{$arr[3]} and exists $exons{$indpar}{'exon'}{$arr[3]}{$arr[4]}) {
-				die "Error: repeated exons ".$arr[3].'-'.$arr[4]. "for mRNA $indpar\n"; 
-			}
-			$exons{$indpar}{'exon'}{$arr[3]}{$arr[4]}=$exonid;
-			$exons{$indpar}{'strand'}{$arr[6]}++;
-			$exons{$indpar}{'score'}{$arr[5]}++;
-			$exons{$indpar}{'reference'}{$arr[0]}++;
-		}
-	}
-	elsif ($arr[2] =~ /^CDS$/i) {
-		next unless (exists $outcode{'2'} or exists $outcode{'4'} or exists $outcode{'10'} or exists $outcode{'11'});
-		my $parent=$arr[8];
-		$parent=~s/^.*Parent=//; $parent=~s/;.*$//;
-#		print "Test: CDS $arr[3]-$arr[4] \tParent: $parent\n";### For test ###
-		my @temparr=split(/,/, $parent);
-		foreach my $indpar (@temparr) {
-			$cds{$indpar}{'exon'}{$arr[3]}{$arr[4]}++;
-			$cds{$indpar}{'strand'}{$arr[6]}++;
-			$cds{$indpar}{'score'}{$arr[5]}++;
-			$cds{$indpar}{'reference'}{$arr[0]}++;
-			$cds{$indpar}{'phase'}{$arr[3]}{$arr[4]}=$arr[7];
-		}
-	}
-}
-close GFFIN;
+#print "\n\n\n### Reading GFF3\n";
+#open (GFFIN, "< $gffin") || die "Error: can not open GFF input\n";
+#while (my $line=<GFFIN>) {
+#	chomp $line;
+#	next if ($line=~/^#/);
+#	my @arr=split(/\t/, $line);
+#	unless (scalar(@arr)==9 and $arr[3]=~/^\d+$/ and $arr[4]=~/^\d+$/ and $arr[3]<=$arr[4]) {
+#		print STDERR "Error: border error ($.): $line\n";
+#		exit 1;
+#	}
+#	unless (defined $arr[6] and $arr[6]=~/(^\+$)|(^-$)/) {
+#		unless ($arr[2]=~/chrom/i) {
+#			print STDERR "Error: unknown strand line($.): $line\n" ;
+#			exit 1;
+#		}
+#	}
+#	if ($arr[2] =~ /^gene$/i) {
+#		next unless (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'} or exists $outcode{'10'} or exists $outcode{'11'});
+#		my $thisgeneid=$arr[8];
+#		$thisgeneid=~s/^.*ID=//;$thisgeneid=~s/;.*$//;
+#		if (exists ${$gene}{$thisgeneid}) {
+#			print STDERR "Error: duplicated gene ID: $thisgeneid\n";
+#			exit 1;
+#		}
+#		${$referenceids}{$arr[0]}{$arr[3]}{$thisgeneid}++;
+#		${$gene}{$thisgeneid}{'reference'}=$arr[0];
+#		${$gene}{$thisgeneid}{'start'}=$arr[3];
+#		${$gene}{$thisgeneid}{'end'}=$arr[4];
+#		${$gene}{$thisgeneid}{'strand'}=$arr[6];
+#		${$gene}{$thisgeneid}{'score'}{$arr[5]}++;
+#		if ($arr[8]=~/Note=(\S+)/) {
+#			my $notes=$1;
+#			$notes=~s/;.*$//;
+#			$notes=~s/\s+$//;
+#			$notes=~s/^\s+//;
+#			${$gene}{$thisgeneid}{'note'}=$notes;
+#		}
+#		print "Test: geneid: $thisgeneid\tgenenote: ", ${$gene}{$thisgeneid}{'note'}, "\n"; ### For test ###
+#	}
+#	elsif ($arr[2] =~ /^mRNA$/i) {
+#		next unless (exists $outcode{'10'} or exists $outcode{'11'});
+#		my $thismrnaid=$arr[8];
+#		$thismrnaid=~s/^.*ID=//; $thismrnaid=~s/;.*$//;
+#		my $parent=$arr[8];
+#		$parent=~s/^.*Parent=//; $parent=~s/;.*$//;
+#		my @temparr=split(/,/, $parent);
+#		${$mrnas}{$thismrnaid}{'start'}=$arr[3];
+#		${$mrnas}{$thismrnaid}{'end'}=$arr[4];
+#		${$mrnas}{$thismrnaid}{'strand'}{$arr[6]}++;
+#		${$mrnas}{$thismrnaid}{'score'}{$arr[5]}++;
+#		${$mrnas}{$thismrnaid}{'reference'}{$arr[0]}++;
+#		foreach my $indpar (@temparr) {
+#			${$gene2mrna}{$indpar}{$thismrnaid}++;
+#		}
+#	}
+#	elsif ($arr[2] =~ /^exon$/i) {
+#		next unless (exists $outcode{'3'} or exists $outcode{'10'} or exists $outcode{'11'});
+#		my $parent=$arr[8];
+#		$parent=~s/^.*Parent=//; $parent=~s/;.*$//;
+###		print "Test: exon $arr[3]-$arr[4] \tParent: $parent\n"; ### For test ###
+#		my @temparr=split(/,/, $parent);
+#		my $exonid=$arr[8];
+#		$exonid=~s/^.*ID=//; $exonid=~s/;.*$//;
+#		foreach my $indpar (@temparr) {
+#			if (exists $exons{$indpar} and exists $exons{$indpar}{'exon'} and exists $exons{$indpar}{'exon'}{$arr[3]} and exists $exons{$indpar}{'exon'}{$arr[3]}{$arr[4]}) {
+#				die "Error: repeated exons ".$arr[3].'-'.$arr[4]. "for mRNA $indpar\n"; 
+#			}
+#			$exons{$indpar}{'exon'}{$arr[3]}{$arr[4]}=$exonid;
+#			$exons{$indpar}{'strand'}{$arr[6]}++;
+#			$exons{$indpar}{'score'}{$arr[5]}++;
+#			$exons{$indpar}{'reference'}{$arr[0]}++;
+#		}
+#	}
+#	elsif ($arr[2] =~ /^CDS$/i) {
+#		next unless (exists $outcode{'2'} or exists $outcode{'4'} or exists $outcode{'10'} or exists $outcode{'11'});
+#		my $parent=$arr[8];
+#		$parent=~s/^.*Parent=//; $parent=~s/;.*$//;
+###		print "Test: CDS $arr[3]-$arr[4] \tParent: $parent\n";### For test ###
+#		my @temparr=split(/,/, $parent);
+#		foreach my $indpar (@temparr) {
+#			${$cds}{$indpar}{'exon'}{$arr[3]}{$arr[4]}++;
+#			${$cds}{$indpar}{'strand'}{$arr[6]}++;
+#			${$cds}{$indpar}{'score'}{$arr[5]}++;
+#			${$cds}{$indpar}{'reference'}{$arr[0]}++;
+#			${$cds}{$indpar}{'phase'}{$arr[3]}{$arr[4]}=$arr[7];
+#		}
+#	}
+#}
+#close GFFIN;
 
 
 
 ### Test
-#print "Test: \%gene\n"; print Dumper \%gene; print "\n"; ### For test ###
-#print "Test: \%cds\n"; print Dumper \%cds; print "\n"; ### For test ###
+#print "Test: \$gene\n"; print Dumper $gene; print "\n"; ### For test ###
+#print "Test: \$cds\n"; print Dumper $cds; print "\n"; ### For test ###
 #print "Test: \%exons\n"; print Dumper \%exons; print "\n"; ### For test ###
-#print "Test: \%referenceids\n"; print Dumper \%referenceids; print "\n"; ### For test ###
-#print "Test: \%mrnas\n"; print Dumper \%mrnas; print "\n"; ### For test ###
-#print "Test: \%gene2mrna\n"; print Dumper \%gene2mrna; print "\n"; ### For test ###
+#print "Test: \$referenceids\n"; print Dumper $referenceids; print "\n"; ### For test ###
+#print "Test: \$mrnas\n"; print Dumper $mrnas; print "\n"; ### For test ###
+#print "Test: \$gene2mrna\n"; print Dumper $gene2mrna; print "\n"; ### For test ###
 #exit 0;
 
 
 print "\n\n### Reading DB: $file_fasta\n";
 my $db = Bio::DB::Fasta->new($file_fasta);
 
+
+
 #Write gene sequences
-if (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'}) {
+if (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'} or exists $outcode{'12'}) {
 	print "### 1. Info: output genome/UpDownstream sequences\n";
-	foreach my $idvgene (sort keys %gene) {
+	foreach my $idvgene (sort keys %{$gene}) {
 	#	print "Info: gene: $idvgene\n"; ### For test ###
 		my $geneseq='';
 		my $upstream3000seq='';
 		my ($upstart, $upend);
 		my $downstream3000seq='';
 		my ($downstart,$downend);
-		my $seqlength=$db->length("$gene{$idvgene}{'reference'}");
+		my $seqlength=$db->length(${$gene}{$idvgene}{'reference'});
 		my $test_upstream=0;
 		my $test_downstream=0;
-		if ($gene{$idvgene}{'strand'} eq '+') {
-			$geneseq=$db->seq($gene{$idvgene}{'reference'}, $gene{$idvgene}{'start'} => $gene{$idvgene}{'end'});
-			if (exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'9'}) {
-				if ($gene{$idvgene}{'start'}>1) {
+		my $rangestart=${$gene}{$idvgene}{'start'};
+		my $rangeend=${$gene}{$idvgene}{'end'};
+		if (${$gene}{$idvgene}{'strand'} eq '+') {
+			$geneseq=$db->seq(${$gene}{$idvgene}{'reference'}, ${$gene}{$idvgene}{'start'} => ${$gene}{$idvgene}{'end'});
+			if (exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'9'} or exists $outcode{'12'}) {
+				if (${$gene}{$idvgene}{'start'}>=1) {
 					$test_upstream=1;
-					$upstart=$gene{$idvgene}{'start'}-$stream;
+					$upstart=${$gene}{$idvgene}{'start'}-$stream;
 					if ($upstart<1) {
 						$upstart=1;
 					}
-					$upend=$gene{$idvgene}{'start'}-1;
+					$upend=${$gene}{$idvgene}{'start'}-1;
 				}
 				else {
-					die "Error: invalid gene start: GENE $idvgene START: ", $gene{$idvgene}{'start'}, "\n";
+					die "Error: invalid gene start: GENE $idvgene START: ", ${$gene}{$idvgene}{'start'}, "\n";
 				}
 				if ($test_upstream==1) {
-					$upstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $upstart => $upend);
+					$upstream3000seq=$db->seq(${$gene}{$idvgene}{'reference'}, $upstart => $upend);
+					$rangestart=$upstart;
 				}
 			}
-			if (exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'}) {
-				if ($gene{$idvgene}{'end'}<$seqlength) {
+			if (exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'} or exists $outcode{'12'}) {
+				if (${$gene}{$idvgene}{'end'}<=$seqlength) {
 					$test_downstream=1;
-					$downstart=$gene{$idvgene}{'end'}+1;
-					$downend=$gene{$idvgene}{'end'}+$stream;
+					$downstart=${$gene}{$idvgene}{'end'}+1;
+					$downend=${$gene}{$idvgene}{'end'}+$stream;
 					if ($downend>$seqlength) {
 						$downend=$seqlength;
 					}
 				}
 				else {
-					die "Error: invalid gene end: GENE $idvgene END: ", $gene{$idvgene}{'start'}, "\n";
+					print Dumper ${$gene}{$idvgene};
+					die "Error: invalid gene end: GENE $idvgene end > seqlength : ", ${$gene}{$idvgene}{'end'}, " > ", $seqlength, "\n";
+					
 				}
 			
 				if ($test_downstream==1) {
-					$downstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $downstart => $downend);
+					$downstream3000seq=$db->seq(${$gene}{$idvgene}{'reference'}, $downstart => $downend);
+					$rangeend=$downend;
 				}
 			}
 		}
-		elsif ($gene{$idvgene}{'strand'} eq '-') {
-			$geneseq=$db->seq($gene{$idvgene}{'reference'}, $gene{$idvgene}{'end'} => $gene{$idvgene}{'start'});
-			if (exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'}) {
-				if ($gene{$idvgene}{'start'}>1) {
+		elsif (${$gene}{$idvgene}{'strand'} eq '-') {
+			$geneseq=$db->seq(${$gene}{$idvgene}{'reference'}, ${$gene}{$idvgene}{'end'} => ${$gene}{$idvgene}{'start'});
+			if (exists $outcode{'7'} or exists $outcode{'8'} or exists $outcode{'9'} or exists $outcode{'12'}) {
+				if (${$gene}{$idvgene}{'start'}>=1) {
 					$test_downstream=1;
-					$downstart=$gene{$idvgene}{'start'}-$stream;
+					$downstart=${$gene}{$idvgene}{'start'}-$stream;
 					if ($downstart<1) {
 						$downstart=1;
 					}
-					$downend=$gene{$idvgene}{'start'}-1;
+					$downend=${$gene}{$idvgene}{'start'}-1;
 				}
 				else {
-					die "Error2: invalid gene start: GENE $idvgene START: ", $gene{$idvgene}{'start'}, "\n";
+					die "Error2: invalid gene start: GENE $idvgene START: ", ${$gene}{$idvgene}{'start'}, "\n";
 				}
 				if ($test_downstream==1) {
-					$downstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $downend => $downstart);
+					$downstream3000seq=$db->seq(${$gene}{$idvgene}{'reference'}, $downend => $downstart);
+					$rangestart=$downstart;
 				}
 			}
-			if (exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'9'}) {
-				if ($gene{$idvgene}{'end'}<$seqlength) {
+			if (exists $outcode{'5'} or exists $outcode{'6'} or exists $outcode{'9'} or exists $outcode{'12'}) {
+				if (${$gene}{$idvgene}{'end'}<=$seqlength) {
 					$test_upstream=1;
-					$upstart=$gene{$idvgene}{'end'}+1;
-					$upend=$gene{$idvgene}{'end'}+$stream;
+					$upstart=${$gene}{$idvgene}{'end'}+1;
+					$upend=${$gene}{$idvgene}{'end'}+$stream;
 					if ($upend>$seqlength) {
 						$upend=$seqlength;
 					}
 				}
 				else {
-					die "Error2: invalid gene end: GENE $idvgene END: ", $gene{$idvgene}{'start'}, "\n";
+					print Dumper ${$gene}{$idvgene};
+					die "Error: invalid gene end: GENE $idvgene end > seqlength : ", ${$gene}{$idvgene}{'end'}, " > ", $seqlength, "\n";
 				}
 				if ($test_upstream==1) {
-					$upstream3000seq=$db->seq($gene{$idvgene}{'reference'}, $upend => $upstart);
+					$upstream3000seq=$db->seq(${$gene}{$idvgene}{'reference'}, $upend => $upstart);
+					$rangeend=$upend;
 				}
 			}
 		}
-		my $genescore='.';
-		my @tempscore=();
-		foreach my $scoreidv (keys %{$gene{$idvgene}{'score'}}) {
-			push (@tempscore, $scoreidv) if (defined $scoreidv and $scoreidv=~/^\d+$/);
 		
-		}
-		if (scalar(@tempscore)>0) {
-			@tempscore=sort {$b<=>$a} @tempscore;
-			$genescore=$tempscore[0];
-		}
-		unless ($genescore =~/^\d*\.{0,1}\d+$/) {
-			$genescore='.';
-		}
+		my $genescore='.';
+		$genescore=${$gene}{$idvgene}{'score'} if (exists ${$gene}{$idvgene}{'score'});
 	### Gene
 	#	print "Info: Write gene: $idvgene\n"; ### For test ###
-		my $seqnote="Score $genescore Strand ".$gene{$idvgene}{'strand'};
-		if (exists $gene{$idvgene}{'note'} and $gene{$idvgene}{'note'}=~/\S+/) {
+		my $seqnote="Score $genescore Strand ".${$gene}{$idvgene}{'strand'};
+		if (exists ${$gene}{$idvgene}{'note'} and ${$gene}{$idvgene}{'note'}=~/\S+/) {
 			$seqnote.=" Note ";
-			$seqnote.=$gene{$idvgene}{'note'};
+			$seqnote.=${$gene}{$idvgene}{'note'};
 		}
 		
 		if (exists $outcode{'1'}) {
@@ -479,6 +472,14 @@ if (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exis
 			);
 			$outfile_updownstream3000with->write_seq($udsonlyseqobj) || print STDERR "Warnings: up/downstream.with $idvgene failed\n";
 		}
+		if (exists $outcode{'12'} and ($test_upstream==1) and ($test_downstream==1) ) {
+			unless ($rangestart=~/^\d+$/ and  $rangeend=~/^\d+$/ and $rangeend>=$rangestart) {
+				die "Error: Seq end $rangeend <= start $rangestart\n";
+			}
+			unless (exists $mergedregion{${$gene}{$idvgene}{'reference'}} and exists $mergedregion{${$gene}{$idvgene}{'reference'}}{$rangestart} and $mergedregion{${$gene}{$idvgene}{'reference'}}{$rangestart}=~/^\d+$/ and $mergedregion{${$gene}{$idvgene}{'reference'}}{$rangestart} >= $rangeend) {
+				$mergedregion{${$gene}{$idvgene}{'reference'}}{$rangestart}= $rangeend;
+			}
+		}
 	}
 }
 
@@ -487,38 +488,13 @@ if (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exis
 #Write exons sequences
 if (exists $outcode{'3'}) {
 	print "### 2. Info: output cDNA sequences\n";
-	foreach my $indexon (sort keys %exons) {
-		my @temparrexon=();
-		#check reference
-		@temparrexon=keys %{$exons{$indexon}{'reference'}};
-		unless (scalar(@temparrexon) ==1 and $temparrexon[0]=~/^\S+$/) {
-			print "Error: transcript $indexon have 2 or 0 references. ignoring...\n";
-			next;
-		}
-		my $exonrefer=$temparrexon[0];
-		#check strand
-		@temparrexon=();
-		@temparrexon=keys %{$exons{$indexon}{'strand'}};
-		unless (scalar(@temparrexon) ==1 and $temparrexon[0]=~/(^\+$)|(^-$)/) {
-			print "Error: transcript $indexon have 2 or 0 strand. ignoring...\n";
-			next;
-		}
-		my $exonstrand=$temparrexon[0];
-		#check scores
-		@temparrexon=();
+	foreach my $indexon (sort keys %{$exons}) {
+		my $exonrefer=${$exons}{$indexon}{'reference'};
+		my $exonstrand=${$exons}{$indexon}{'strand'};
 		my $exonscore='.';
-		foreach my $scoreidv (keys %{$exons{$indexon}{'score'}}) {
-			push (@temparrexon, $scoreidv) if ($scoreidv=~/^\d+$/);
-		}
-		if (scalar(@temparrexon)>0) {
-			@temparrexon=sort {$b<=>$a} @temparrexon;
-			unless (scalar(@temparrexon) ==1) {
-				print "Error: transcript $indexon have 2 or 0 scores. get the bigger one\n";
-			}
-			$exonscore=$temparrexon[0];
-		}
+		$exonscore=${$exons}{$indexon}{'score'} if (exists ${$exons}{$indexon}{'score'});
 		#check overlaps
-		my ($testoverlap, $exonarr)=&CheckOverlap($exons{$indexon}{'exon'});
+		my ($testoverlap, $exonarr)=&CheckOverlap(${$exons}{$indexon}{'exon'});
 		unless ($testoverlap) {
 			print STDERR "Error: transcript $indexon have exon overlaps\n";
 			next;
@@ -531,8 +507,8 @@ if (exists $outcode{'3'}) {
 		my $genename=$indexon;
 		$genename=~s/\.trans\d+.*//;
 		my $transnote='';
-		if (exists $gene{$genename} and $gene{$genename}{'note'}) {
-			$transnote=" Note ".$gene{$genename}{'note'};
+		if (exists ${$gene}{$genename} and ${$gene}{$genename}{'note'}) {
+			$transnote=" Note ".${$gene}{$genename}{'note'};
 		}
 		my $exonseqobj = Bio::Seq->new(
 				-seq        => $exonseq,
@@ -552,11 +528,14 @@ if (exists $outcode{'3'}) {
 
 ### CDS
 if (exists $outcode{'2'} or exists $outcode{'4'}) {
-	print "### 3. Info: output CDS sequences\n";
-	foreach my $indcds (sort keys %cds) {
+	print "### 3. Info: output CDS sequences\n" if (exists $outcode{'2'});
+	print "### 3. Info: output Protein sequences\n" if (exists $outcode{'4'});
+	foreach my $indcds (sort keys %{$cds}) {
 		my ($cdsseq, $translateseq)=&getProtein($indcds);
 
 		if (exists $outcode{'2'}) {
+		
+		
 			$outfile_cds->write_seq($cdsseq) || print STDERR "Warnings: write cds $indcds failed\n";
 		}
 
@@ -571,7 +550,7 @@ if (exists $outcode{'2'} or exists $outcode{'4'}) {
 ### 3. gff2embl
 if (exists $outcode{'10'} or exists $outcode{'11'}) {
 	print "\n\n### Info: output EMBL\n";
-	foreach my $ind_ref (sort keys %referenceids) {
+	foreach my $ind_ref (sort keys %{$referenceids}) {
 		my $seqlength=$db->length("$ind_ref");
 		my $outfile;
 		if (exists $outcode{'10'}) {
@@ -587,13 +566,13 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 			&PrintEmbl('FT', '', "/mol_type=\"genomic DNA\"");
 		}
 		
-		foreach my $ind_num (sort {$a <=> $b} keys %{$referenceids{$ind_ref}}) {
-			foreach my $ind_geneid (sort keys %{$referenceids{$ind_ref}{$ind_num}}) {
+		foreach my $ind_num (sort {$a <=> $b} keys %{${$referenceids}{$ind_ref}}) {
+			foreach my $ind_geneid (sort keys %{${$referenceids}{$ind_ref}{$ind_num}}) {
 				my ($cutstart, $cutend, $tobecut);
 				if (exists $outcode{'11'}) {
-					$cutstart=$gene{$ind_geneid}{'start'}-$stream;
+					$cutstart=${$gene}{$ind_geneid}{'start'}-$stream;
 					$cutstart=1 unless ($cutstart>0);
-					$cutend=$gene{$ind_geneid}{'end'}+$stream;
+					$cutend=${$gene}{$ind_geneid}{'end'}+$stream;
 					$cutend=$seqlength if ($cutend>$seqlength);
 					$tobecut=$cutstart-1;
 					($outfile=$ind_geneid)=~s/\|/_/g;($outfile=$ind_geneid)=~s/:/_/g;
@@ -606,11 +585,11 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					&PrintEmbl('FH');
 					&PrintEmbl('FT', 'source', "1..".($cutend-$cutstart+1));
 					&PrintEmbl('FT', '', "/mol_type=\"genomic DNA\"");
-					if ($gene{$ind_geneid}{'strand'} eq '+') {
-						&PrintEmbl('FT', 'gene', ($gene{$ind_geneid}{'start'}-$tobecut)."..".($gene{$ind_geneid}{'end'}-$tobecut));
+					if (${$gene}{$ind_geneid}{'strand'} eq '+') {
+						&PrintEmbl('FT', 'gene', (${$gene}{$ind_geneid}{'start'}-$tobecut)."..".(${$gene}{$ind_geneid}{'end'}-$tobecut));
 					}
-					elsif ($gene{$ind_geneid}{'strand'} eq '-') {
-						&PrintEmbl('FT', 'gene', 'complement('.($gene{$ind_geneid}{'start'}-$tobecut)."..".($gene{$ind_geneid}{'end'}-$tobecut).')');
+					elsif (${$gene}{$ind_geneid}{'strand'} eq '-') {
+						&PrintEmbl('FT', 'gene', 'complement('.(${$gene}{$ind_geneid}{'start'}-$tobecut)."..".(${$gene}{$ind_geneid}{'end'}-$tobecut).')');
 					}
 					else {
 						print STDERR "Warnings1: strand error: GENE $ind_geneid\n";
@@ -619,11 +598,11 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
 				}
 				if (exists $outcode{'10'}) {
-					if ($gene{$ind_geneid}{'strand'} eq '+') {
-						&PrintEmbl('FT', 'gene', $gene{$ind_geneid}{'start'}."..".$gene{$ind_geneid}{'end'});
+					if (${$gene}{$ind_geneid}{'strand'} eq '+') {
+						&PrintEmbl('FT', 'gene', ${$gene}{$ind_geneid}{'start'}."..".${$gene}{$ind_geneid}{'end'});
 					}
-					elsif ($gene{$ind_geneid}{'strand'} eq '-') {
-						&PrintEmbl('FT', 'gene', 'complement('.$gene{$ind_geneid}{'start'}."..".$gene{$ind_geneid}{'end'}.')');
+					elsif (${$gene}{$ind_geneid}{'strand'} eq '-') {
+						&PrintEmbl('FT', 'gene', 'complement('.${$gene}{$ind_geneid}{'start'}."..".${$gene}{$ind_geneid}{'end'}.')');
 					}
 					else {
 						print STDERR "Warnings2:  strand error: GENE $ind_geneid\n";
@@ -632,22 +611,22 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
 				}
 				
-				unless (exists $gene2mrna{$ind_geneid}) {### check if gene got mrna
+				unless (exists ${$gene2mrna}{$ind_geneid}) {### check if gene got mrna
 					print STDERR "Warnings: GENE $ind_geneid no mRNAs\n";
 				}
-				###Strand: $gene{$ind_geneid}{'strand'}
-				unless ($gene{$ind_geneid}{'strand'} =~/^(\+)|(\-)$/) {
+				###Strand: ${$gene}{$ind_geneid}{'strand'}
+				unless (${$gene}{$ind_geneid}{'strand'} =~/^(\+)|(\-)$/) {
 					die "Error: unknown strand GENE $ind_geneid\n";
 				}
 				
-				foreach my $ind_mrnaid (sort keys %{$gene2mrna{$ind_geneid}}) { 
+				foreach my $ind_mrnaid (sort keys %{${$gene2mrna}{$ind_geneid}}) { 
 					###mRNA
 					my %uniqueexons=();
 					my $exonidname=$ind_geneid."exon00000001";
-					my ($testoverlap, $exonarr)=&CheckOverlap($exons{$ind_mrnaid}{'exon'});
+					my ($testoverlap, $exonarr)=&CheckOverlap(${$exons}{$ind_mrnaid}{'exon'});
 					unless ($testoverlap) {
 						print STDERR "Error2: transcript $ind_mrnaid have exon overlaps\n";
-						print Dumper $exons{$ind_mrnaid}{'exon'};
+						print Dumper ${$exons}{$ind_mrnaid}{'exon'};
 						next;
 					}
 					my @mrnaexons=();
@@ -663,10 +642,10 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 						print STDERR "Warnings: GENE $ind_geneid mRNA $ind_mrnaid no exons\n";
 					}
 					my $mrnastr='';
-					if ($gene{$ind_geneid}{'strand'} eq '+') {
+					if (${$gene}{$ind_geneid}{'strand'} eq '+') {
 						$mrnastr='join('. join(',', @mrnaexons).')';
 					}
-					elsif ($gene{$ind_geneid}{'strand'} eq '-') {
+					elsif (${$gene}{$ind_geneid}{'strand'} eq '-') {
 						$mrnastr='complement(join('. join(',', @mrnaexons).'))';
 					}
 					else {
@@ -681,7 +660,7 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					###exon
 					foreach my $exonnum (@{$exonarr}) { 
 						if (exists $outcode{'10'}) {
-							if ($gene{$ind_geneid}{'strand'} eq '+') {
+							if (${$gene}{$ind_geneid}{'strand'} eq '+') {
 								&PrintEmbl('FT', 'exon', ${$exonnum}[0].'..'.${$exonnum}[1]);
 							}
 							else {
@@ -689,7 +668,7 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 							}
 						}
 						if (exists $outcode{'11'}) {
-							if ($gene{$ind_geneid}{'strand'} eq '+') {
+							if (${$gene}{$ind_geneid}{'strand'} eq '+') {
 								&PrintEmbl('FT', 'exon', (${$exonnum}[0]-$tobecut).'..'.(${$exonnum}[1]-$tobecut));
 							}
 							else {
@@ -699,8 +678,8 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 						my $thisexonid='';
 						my $testunique=0;
 						
-						if (exists $exons{$ind_mrnaid} and exists $exons{$ind_mrnaid}{'exon'} and exists $exons{$ind_mrnaid}{'exon'}{${$exonnum}[0]} and exists $exons{$ind_mrnaid}{'exon'}{${$exonnum}[0]}{${$exonnum}[1]}) {
-							$thisexonid=$exons{$ind_mrnaid}{'exon'}{${$exonnum}[0]}{${$exonnum}[1]};
+						if (exists ${$exons}{$ind_mrnaid} and exists ${$exons}{$ind_mrnaid}{'exon'} and exists ${$exons}{$ind_mrnaid}{'exon'}{${$exonnum}[0]} and exists ${$exons}{$ind_mrnaid}{'exon'}{${$exonnum}[0]}{${$exonnum}[1]}) {
+							$thisexonid=${$exons}{$ind_mrnaid}{'exon'}{${$exonnum}[0]}{${$exonnum}[1]};
 						}
 						else {
 							while ($testunique==0) {
@@ -716,9 +695,9 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					}
 					###CDS
 					@mrnaexons=();
-					my ($testoverlap2, $cdsarr)=&CheckOverlap($cds{$ind_mrnaid}{'exon'});
+					my ($testoverlap2, $cdsarr)=&CheckOverlap(${$cds}{$ind_mrnaid}{'cds'});
 					unless ($testoverlap2) {
-						print Dumper $cds{$ind_mrnaid}{'exon'};
+						print Dumper ${$cds}{$ind_mrnaid}{'cds'};
 						die "Error: transcript $ind_mrnaid have CDS overlaps\n";
 					}
 					if (scalar(@{$cdsarr})>0) {
@@ -731,10 +710,10 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 							}
 						}
 						my $cdsstr='';
-						if ($gene{$ind_geneid}{'strand'} eq '+') {
+						if (${$gene}{$ind_geneid}{'strand'} eq '+') {
 							$cdsstr='join('. join(',', @mrnaexons).')';
 						}
-						elsif ($gene{$ind_geneid}{'strand'} eq '-') {
+						elsif (${$gene}{$ind_geneid}{'strand'} eq '-') {
 							$cdsstr='complement(join('. join(',', @mrnaexons).'))';
 						}
 						else {
@@ -777,6 +756,157 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 				next;
 			}
 		}
+	}
+}
+
+
+
+
+if (exists $outcode{'12'}) {
+	my %sequence_writen=();
+	foreach my $idvref (sort keys %mergedregion) {
+		my @regionunique=();
+		my $region_start=0;
+		my $region_end=0;
+		my $test1=0;
+		foreach my $num1 (sort {$a<=>$b} keys %{$mergedregion{$idvref}}) {
+			if ($test1==0) {
+				$region_start=$num1;
+				$region_end=$mergedregion{$idvref}{$num1};
+				$test1++;
+			}
+			else {
+				if ($num1>=$region_start and $num1<=($region_end+1)) {
+					if ($region_end<$mergedregion{$idvref}{$num1}) {
+						$region_end=$mergedregion{$idvref}{$num1};
+					}
+				}
+				elsif ($num1> ($region_end+1)) {
+					push (@regionunique, [$region_start, $region_end]);
+					$region_start=$num1;
+					$region_end=$mergedregion{$idvref}{$num1};
+				}
+				else {
+					print Dumper $mergedregion{$idvref};
+					die "Error: unknown error: REF $idvref\n";
+				}
+			}
+		}
+		push (@regionunique, [$region_start, $region_end]);
+		unless (exists ${$referenceids}{$idvref}) {
+			die "Error: no gene on $idvref\n";
+		}
+		my @genenames=();
+		my $test2=0;
+		foreach (sort {$a<=>$b} keys %{${$referenceids}{$idvref}}) {
+			foreach my $idvgenename (sort keys %{${$referenceids}{$idvref}{$_}}) {
+				$genenames[$test2++]=$idvgenename;
+			}
+		}
+		delete ${$referenceids}{$idvref};
+		foreach my $idvgenename (@genenames) {
+			unless (exists ${$gene}{$idvgenename}) {
+				die "Error: gene id not exists: REF $idvref GENE $idvgenename\n";
+			}
+			unless (exists ${$gene}{$idvgenename}{'start'} and ${$gene}{$idvgenename}{'start'}=~/^\d+$/ and ${$gene}{$idvgenename}{'start'}>0) {
+				die "Error: gene id start problem: REF $idvref GENE $idvgenename\n";
+			}
+			unless (exists ${$gene}{$idvgenename}{'end'} and ${$gene}{$idvgenename}{'end'}=~/^\d+$/ and ${$gene}{$idvgenename}{'end'}>0) {
+				die "Error: gene id end problem: REF $idvref GENE $idvgenename\n";
+			}
+			my $genecutoff=0;
+			my $test3=0;
+			my @regioncoord=();
+			foreach (@regionunique) {
+				if (${$gene}{$idvgenename}{'start'}>=$_->[0] and ${$gene}{$idvgenename}{'end'}<=$_->[1]) {
+					$test3++;
+					$genecutoff=$_->[0] - 1;
+					@regioncoord=($_->[0], $_->[1]);
+				}
+			}
+			unless ($test3==1) {
+				die "Error: unique region problem: REF $idvref GENE $idvgenename\n";
+			}
+			if ($genecutoff<0) {
+				die "Error: unique region start: REF $idvref GENE $idvgenename\n";
+			}
+			### write sequence
+			my $idvrefname=${$gene}{$idvgenename}{'reference'}.'_'.$regioncoord[0].'_'.$regioncoord[1];
+			
+			unless (exists $sequence_writen{$idvrefname}) {
+				my $mergedgeneseq=$db->seq(${$gene}{$idvgenename}{'reference'}, $regioncoord[0] => $regioncoord[1]);
+				my $mergedgeneseqobj = Bio::Seq->new(
+				-seq        => $mergedgeneseq,
+				-id         => $idvrefname,
+				-display_id => $idvrefname,
+				-alphabet   => 'dna',
+				-desc       => "Source:".${$gene}{$idvgenename}{'reference'}.":".$regioncoord[0]."-".$regioncoord[1],
+												);
+				$outfile_updownstream3000with->write_seq($mergedgeneseqobj) || print STDERR "Warnings: failed to write sequence region: $idvrefname\n";
+				$sequence_writen{$idvrefname}++;
+			}
+			${$gene}{$idvgenename}{'start'}=${$gene}{$idvgenename}{'start'}-$genecutoff;
+			${$gene}{$idvgenename}{'end'}=${$gene}{$idvgenename}{'end'}-$genecutoff;
+			${$gene}{$idvgenename}{'reference'}=${$gene}{$idvgenename}{'reference'}.'_'.$regioncoord[0].'_'.$regioncoord[1];
+			${$referenceids}{$idvrefname}{${$gene}{$idvgenename}{'start'}}{$idvgenename}++;
+			unless (exists ${$gene2mrna}{$idvgenename}) {
+				die "Error: gene do not have mRNA: $idvgenename\n"
+			}
+			foreach my $idvmrnaname (sort keys %{${$gene2mrna}{$idvgenename}}) {
+				### mRNA
+				${$mrnas}{$idvmrnaname}{'start'}=${$mrnas}{$idvmrnaname}{'start'}-$genecutoff;
+				${$mrnas}{$idvmrnaname}{'end'}=${$mrnas}{$idvmrnaname}{'end'}-$genecutoff;
+				${$mrnas}{$idvmrnaname}{'reference'}=$idvrefname;
+				### exon
+				if (exists ${$exons}{$idvmrnaname}) {
+					${$exons}{$idvmrnaname}{'reference'}=$idvrefname;
+					if (exists ${$exons}{$idvmrnaname}{'exon'}) {
+						my @temparr1=sort {$a<=>$b} keys %{${$exons}{$idvmrnaname}{'exon'}};
+						foreach my $x (@temparr1) {
+							my @temparr2=sort {$a<=>$b} keys %{${$exons}{$idvmrnaname}{'exon'}{$x}};
+							foreach my $y (@temparr2) {
+								my $exonid=${$exons}{$idvmrnaname}{'exon'}{$x}{$y};
+								delete ${$exons}{$idvmrnaname}{'exon'}{$x}{$y};
+								${$exons}{$idvmrnaname}{'exon'}{$x-$genecutoff}{$y-$genecutoff}=$exonid;
+							}
+							delete ${$exons}{$idvmrnaname}{'exon'}{$x} if (scalar(keys %{${$exons}{$idvmrnaname}{'exon'}{$x}})==0);
+						}
+					}
+				}
+				### CDS
+				if (exists ${$cds}{$idvmrnaname}) {
+					${$cds}{$idvmrnaname}{'reference'}=$idvrefname;
+					if (exists ${$cds}{$idvmrnaname}) {
+						my @temparr1=sort {$a<=>$b} keys %{${$cds}{$idvmrnaname}{'cds'}};
+						foreach my $x (@temparr1) {
+							my @temparr2=sort {$a<=>$b} keys %{${$cds}{$idvmrnaname}{'cds'}{$x}};
+							foreach my $y (@temparr2) {
+								my $exonid=${$cds}{$idvmrnaname}{'cds'}{$x}{$y};
+								delete ${$cds}{$idvmrnaname}{'cds'}{$x}{$y};
+								${$cds}{$idvmrnaname}{'cds'}{$x-$genecutoff}{$y-$genecutoff}=$exonid;
+							}
+							delete ${$cds}{$idvmrnaname}{'cds'}{$x} if (scalar(keys %{${$cds}{$idvmrnaname}{'cds'}{$x}})==0);
+						}
+					}
+					if (exists ${$cds}{$idvmrnaname}{'phase'}) {
+						my @temparr1=sort {$a<=>$b} keys %{${$cds}{$idvmrnaname}{'phase'}};
+						foreach my $x (@temparr1) {
+							my @temparr2=sort {$a<=>$b} keys %{${$cds}{$idvmrnaname}{'phase'}{$x}};
+							foreach my $y (@temparr2) {
+								my $phase=${$cds}{$idvmrnaname}{'phase'}{$x}{$y};
+								delete ${$cds}{$idvmrnaname}{'phase'}{$x}{$y};
+								${$cds}{$idvmrnaname}{'phase'}{$x-$genecutoff}{$y-$genecutoff}=$phase;
+							}
+							delete ${$cds}{$idvmrnaname}{'phase'}{$x} if (scalar(keys %{${$cds}{$idvmrnaname}{'phase'}{$x}})==0);
+						}
+					}
+				}
+			}
+		}
+	}
+#	print Dumper $referenceids; ### For test ###
+	unless (WriteGff3($outputgff3, $referenceids, $gene2mrna, $gene, $mrnas, $exons, $cds)) {
+		die "Error: failed to write output GFF3\n";
 	}
 }
 
@@ -885,44 +1015,25 @@ sub PrintEmbl {
 ### getProtein($mrna_id)
 ### Return: CDS Protein seqobj for that mRNA ID, and desc
 ### Dependency: 
-### Global: %cds
+### Global: $cds, $gene
 ### Note:
 sub getProtein {
 	my $GPmrnaid=shift;
-	
+
 	my $GPsubinfo="SUB(getProtein)";
 	my $GPcdsseq='';
 	my $GPtranslateseq='';
-	
 	my @GPtemparrcds=();
-	#check reference
-	@GPtemparrcds=keys %{$cds{$GPmrnaid}{'reference'}};
-	unless (scalar(@GPtemparrcds) == 1 and $GPtemparrcds[0]=~/^\S+$/) {
-		die "Error: transcript $GPmrnaid have 2 or 0 references. ignoring...\n";
-	}
-	my $GPcdsrefer=$GPtemparrcds[0];
+
+	my $GPcdsrefer=${$cds}{$GPmrnaid}{'reference'};
 	#check strand
-	@GPtemparrcds=();
-	@GPtemparrcds=keys %{$cds{$GPmrnaid}{'strand'}};
-	unless (scalar(@GPtemparrcds) ==1 and $GPtemparrcds[0]=~/(^\+$)|(^-$)/) {
-		die "Error: transcript $GPmrnaid have 2 or 0 strand. ignoring...\n";
-	}
-	my $GPcdsstrand=$GPtemparrcds[0];
+	my $GPcdsstrand=${$cds}{$GPmrnaid}{'strand'};
 	#check scores
-	@GPtemparrcds=();
 	my $GPcdsscore='.';
-	foreach my $GPscoreidv (keys %{$cds{$GPmrnaid}{'score'}}) {
-		push (@GPtemparrcds, $GPscoreidv) if (defined $GPscoreidv and $GPscoreidv=~/^\d+$/);
-	}
-	if (scalar(@GPtemparrcds)>0) {
-		@GPtemparrcds=sort {$b<=>$a} @GPtemparrcds;
-		unless (scalar(@GPtemparrcds) ==1 and $GPtemparrcds[0]=~/^\d+$/) {
-			print STDERR "Warnings: transcript $GPmrnaid have 2 or 0 scores. get the bigger one\n";
-		}
-		$GPcdsscore=$GPtemparrcds[0];
-	}
+	$GPcdsscore=${$cds}{$GPmrnaid}{'score'} if (exists ${$cds}{$GPmrnaid} and exists ${$cds}{$GPmrnaid}{'score'});
+
 	#check overlaps
-	my ($GPtestoverlap, $GPcdsarr)=&CheckOverlap($cds{$GPmrnaid}{'exon'});
+	my ($GPtestoverlap, $GPcdsarr)=&CheckOverlap(${$cds}{$GPmrnaid}{'cds'});
 	unless ($GPtestoverlap) {
 		die "Error: transcript $GPmrnaid have cds overlaps\n";
 	}
@@ -930,8 +1041,8 @@ sub getProtein {
 	my @GPphases=();
 	foreach my $GPcdsnum (@{$GPcdsarr}) {
 		$GPcdsseq.=$db->seq($GPcdsrefer, ${$GPcdsnum}[0] => ${$GPcdsnum}[1]);
-		if (exists $cds{$GPmrnaid}{'phase'} and exists $cds{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]} and exists $cds{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]} and defined $cds{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]} and $cds{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]}=~/^\d+$/ and $cds{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]}>=0 and $cds{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]}<=2) {
-			push (@GPphases, $cds{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]});
+		if (exists ${$cds}{$GPmrnaid}{'phase'} and exists ${$cds}{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]} and exists ${$cds}{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]} and defined ${$cds}{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]} and ${$cds}{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]}=~/^\d+$/ and ${$cds}{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]}>=0 and ${$cds}{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]}<=2) {
+			push (@GPphases, ${$cds}{$GPmrnaid}{'phase'}{${$GPcdsnum}[0]}{${$GPcdsnum}[1]});
 		}
 		else {
 			print STDERR "Warnings: unknown mRNA ($GPmrnaid) CDS (${$GPcdsnum}[0]-${$GPcdsnum}[1]) phase\n";
@@ -941,8 +1052,8 @@ sub getProtein {
 	my $GPgenename=$GPmrnaid;
 	$GPgenename=~s/\..*//;
 	my $GPtransnote='';
-	if (exists $gene{$GPgenename} and $gene{$GPgenename}{'note'}) {
-		$GPtransnote=" Note ".$gene{$GPgenename}{'note'};
+	if (exists ${$gene}{$GPgenename} and ${$gene}{$GPgenename}{'note'}) {
+		$GPtransnote=" Note ".${$gene}{$GPgenename}{'note'};
 	}
 	my $GPcdsseqobj = Bio::Seq->new(
 			-seq        => $GPcdsseq,
@@ -1042,30 +1153,30 @@ sub GetCdsPhase {
 	$GCPmrnaid='unknown' unless (defined $GCPmrnaid);
 	
 #	print Dumper $GCPcdsarr; ### For test ###
-	my $phase=0;
+	my $GCPphase=0;
 	if ($GCPstrand eq '+') {
-		$phase=${$GCPexistingphase}[0];
+		$GCPphase=${$GCPexistingphase}[0];
 		if ($GCPwhichend==5) {
 			foreach my $GCPindcds (@{$GCPcdsarr}) {
-				push (@GCPphase,  $phase);
-				$phase=3-($GCPindcds->[1]-$GCPindcds->[0]+1-$phase)%3;
-				$phase=0 if ($phase==3);
+				push (@GCPphase,  $GCPphase);
+				$GCPphase=3-($GCPindcds->[1]-$GCPindcds->[0]+1-$GCPphase)%3;
+				$GCPphase=0 if ($GCPphase==3);
 			}
 		}
-		$phase=$GCPphase[0];
+		$GCPphase=$GCPphase[0];
 	}
 	elsif ($GCPstrand eq '-') {
-		$phase=${$GCPexistingphase}[-1];
+		$GCPphase=${$GCPexistingphase}[-1];
 		if ($GCPwhichend==5) {
 			for (my $GCPi=(scalar(@{$GCPcdsarr})-1); $GCPi>=0; $GCPi--) {
-				unshift (@GCPphase,  $phase);
+				unshift (@GCPphase,  $GCPphase);
 	#			print "Start: ${$GCPcdsarr}[$GCPi][0]\n"; ### For test ###
 	#			print "End: ${$GCPcdsarr}[$GCPi][1]\n"; ### For test ###
-				$phase=3- ((${$GCPcdsarr}[$GCPi][1]-${$GCPcdsarr}[$GCPi][0] + 1 - $phase)%3);
-				$phase=0 if ($phase==3);
+				$GCPphase=3- ((${$GCPcdsarr}[$GCPi][1]-${$GCPcdsarr}[$GCPi][0] + 1 - $GCPphase)%3);
+				$GCPphase=0 if ($GCPphase==3);
 			}
 		}
-		$phase=$GCPphase[-1];
+		$GCPphase=$GCPphase[-1];
 	}
 	
 	for (my $GCPj=0; $GCPj<scalar(@{$GCPcdsarr}); $GCPj++) {
