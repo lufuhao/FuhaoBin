@@ -12,34 +12,35 @@ use constant USAGE=><<EOH;
 SYNOPSIS:
 
 perl $0 --input my.fa [Options]
-Version: LUFUHAO20141016
+Version: LUFUHAO20171113
 
 Requirements:
-	Programs:
-	Modiles: Scalar::Util, Cwd, Getopt::Long, FindBin
+    Programs:
+    Modiles: Scalar::Util, Cwd, Getopt::Long, FindBin
 
 Descriptions:
-	Determine the insert size given pairs of seqing data by
-	mapping them to a reference.
+    Determine the insert size given pairs of seqing data by
+    mapping them to a reference.
 
 Options:
-	--help|-h
-		Print this help/usage;
-
-	--verbose
-		Detailed output for trouble-shooting;
-	--version|v!
-		Print current SCRIPT version;
+    --help|-h
+        Print this help/usage;
+    --input|-i
+        
+    --verbose
+        Detailed output for trouble-shooting;
+    --version|v!
+        Print current SCRIPT version;
 
 Example:
-	perl $0 
+    perl $0 
 
 Author:
-	Fu-Hao Lu
-	Post-Doctoral Scientist in Micheal Bevan laboratory
-	Cell and Developmental Department, John Innes Centre
-	Norwich NR4 7UH, United Kingdom
-	E-mail: Fu-Hao.Lu\@jic.ac.uk
+    Fu-Hao Lu
+    Post-Doctoral Scientist in Micheal Bevan laboratory
+    Cell and Developmental Department, John Innes Centre
+    Norwich NR4 7UH, United Kingdom
+    E-mail: Fu-Hao.Lu\@jic.ac.uk
 
 EOH
 ###HELP ends#########################################################

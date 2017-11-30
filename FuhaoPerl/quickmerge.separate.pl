@@ -95,7 +95,7 @@ my $deltafilter_option=" -i 99.00 -r -q ";
 my $quickmerge_option="  -hco 5.0 -c 1.5 -l 5000 -ml 500 ";
 my $out_assembled="$prefix.assembled.fasta";
 $out_assembled=AddFilePath($out_assembled);
-my $out_not_assembled="$prefix.not.assembled.fasta";
+my $out_not_assembled="$prefix.not.assembled.query.list";
 $out_not_assembled=AddFilePath($out_not_assembled);
 my $out_rfn2qry="$prefix.assembled.rfn2qry";
 $out_rfn2qry=AddFilePath($out_rfn2qry);
@@ -511,10 +511,14 @@ close OVERASSEMBLED;
 
 print "\n\n\n########################################\n";
 print "Script running successfully finished\n";
-print "Total runs:   $total_runs\n";
-print "Successful:   $successful_runs\n";
-print "Failed:       ", ($total_runs-$successful_runs), "\n";
- 
+print "Total runs:     $total_runs\n";
+print "Successful:     $successful_runs\n";
+print "Failed:         ", ($total_runs-$successful_runs), "\n";
+print "Total refseqs:  ", scalar(keys %rfn2qry), "\n";
+print "  -successful   ", scalar(keys %final_rfn2qry), "\n";
+print "Total query:    ", scalar(keys %qry2rfn), "\n";
+print "  -successful   ", scalar(keys %final_qry2rfn), "\n";
+
 
 
 #####################################################################
@@ -538,17 +542,21 @@ sub RunMummerplot {
 		print STDERR $RMsubino, "Error: nucmer output error\n";
 		return 0;
 	}
-	if ($verbose) {
+	if (0) {### Test ###
 		unless (exec_cmd_return("show-coords  $showcoords_options $RMpfx.delta > $RMpfx.delta.coord 2> /dev/null")) {
 			print STDERR $RMsubino, "Error: show-coords running failed\n";
 		}
-		unless (exec_cmd_return("mummerplot --layout --large --postscript -p $RMpfx $RMpfx.delta > /dev/null 2>&1")) {
+	}
+	if (1) {### Test ###
+		unless (exec_cmd_return("mummerplot --large --png -p $RMpfx $RMpfx.delta > /dev/null 2>&1")) {
 			print STDERR $RMsubino, "Error: mummerplot running failed 1\n";
 		}
+	}
+	if (0) {### Test ###
 		unless (exec_cmd_return("delta-filter -1 -i 99.00 $RMpfx.delta > $RMpfx.1to1.delta 2> /dev/null")) {
 			print STDERR $RMsubino, "Error: delta-filter running failed 2\n";
 		}
-		unless (exec_cmd_return("mummerplot --layout --large --postscript -p $RMpfx.1to1 $RMpfx.1to1.delta > /dev/null 2>&1")) {
+		unless (exec_cmd_return("mummerplot --layout --large --png -p $RMpfx.1to1 $RMpfx.1to1.delta > /dev/null 2>&1")) {
 			print STDERR $RMsubino, "Error: mummerplot running failed 2\n";
 		}
 		
