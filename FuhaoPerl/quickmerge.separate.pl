@@ -4,7 +4,7 @@ use warnings;
 use Getopt::Long;
 use Cwd;
 use FuhaoPerl5Lib::CmdKit qw/exec_cmd_return CanRun/;
-use FuhaoPerl5Lib::FastaKit qw/IndexFasta ExtractFastaSeqtk NumSeq/;
+use FuhaoPerl5Lib::FastaKit qw/IndexFasta ExtractFastaSeqtk NumSeq RmSeqDesc/;
 use FuhaoPerl5Lib::FileKit qw /DeletePath AddFilePath MergeFiles CountLines/;
 use constant USAGE=><<EOH;
 
@@ -239,6 +239,14 @@ foreach my $ref (sort keys %rfn2qry) {
 		print STDERR "Warnings: failed to extract reference fa: $ref\n";
 		next;
 	}
+	unless (RmSeqDesc($rawreffa, "$rawreffa.NOdesc.fa")) {
+		print STDERR "Warnings: failed to remove seq desc reference fa: $ref\n";
+		next;
+	}
+	else {
+		unlink $rawreffa;
+		$rawreffa.=".NOdesc.fa";
+	}
 
 ### Extract raw query
 	close LISTQUERY if (defined fileno(LISTQUERY));
@@ -256,6 +264,14 @@ foreach my $ref (sort keys %rfn2qry) {
 		unless (&GetSubSeq($queryfasta, $rawqueryfa, $rawquerylist, $numqry1)) {
 			print STDERR "Warnings: failed to extract query fa: $ref\n";
 			next;
+		}
+		unless (RmSeqDesc($rawqueryfa, "$rawqueryfa.NOdesc.fa")) {
+			print STDERR "Warnings: failed to remove seq desc query fa: $ref\n";
+			next;
+		}
+		else {
+			unlink $rawqueryfa;
+			$rawqueryfa.=".NOdesc.fa";
 		}
 	}
 	else {
@@ -547,7 +563,7 @@ sub RunMummerplot {
 			print STDERR $RMsubino, "Error: show-coords running failed\n";
 		}
 	}
-	if (1) {### Test ###
+	if (0) {### Test ###
 		unless (exec_cmd_return("mummerplot --large --png -p $RMpfx $RMpfx.delta > /dev/null 2>&1")) {
 			print STDERR $RMsubino, "Error: mummerplot running failed 1\n";
 		}
@@ -568,6 +584,8 @@ sub RunMummerplot {
 		unless (exec_cmd_return("show-coords  $showcoords_options $RMpfx.rq.delta > $RMpfx.rq.delta.coord 2> /dev/null")) {
 			print STDERR $RMsubino, "Error: show-coords running failed\n";
 		}
+	}
+	if (1) {
 		unless (exec_cmd_return("mummerplot --layout --large --postscript -p $RMpfx.rq $RMpfx.rq.delta > /dev/null 2>&1")) {
 			print STDERR $RMsubino, "Error: mummerplot running failed 3\n";
 		}
@@ -581,7 +599,7 @@ sub RunMummerplot {
 sub GetSubSeq {
 	my ($GSSin, $GSSout, $GSSlist, $GSSexp_num)=@_;
 	
-	my $GSSsubinfo='SUB()';
+	my $GSSsubinfo='SUB(GetSubSeq)';
 	
 	unless (defined $GSSin and -s $GSSin) {
 		print STDERR $GSSsubinfo, "Error: invalid fasta input\n";
