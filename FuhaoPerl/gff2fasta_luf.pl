@@ -53,7 +53,7 @@ Options:
         Print current SCRIPT version;
 
 
-v20170922
+v20180213
 
 EOH
 die USAGE unless @ARGV;
@@ -307,6 +307,9 @@ if (exists $outcode{'1'} or exists $outcode{'5'} or exists $outcode{'6'} or exis
 		my $downstream3000seq='';
 		my ($downstart,$downend);
 		my $seqlength=$db->length(${$gene}{$idvgene}{'reference'});
+		unless (defined $seqlength and $seqlength=~/^\d+$/ and $seqlength>0) {
+			die "Error: invalid seq length: SeqID ", ${$gene}{$idvgene}{'reference'}, "\n";
+		}
 		my $test_upstream=0;
 		my $test_downstream=0;
 		my $rangestart=${$gene}{$idvgene}{'start'};
@@ -552,6 +555,9 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 	print "\n\n### Info: output EMBL\n";
 	foreach my $ind_ref (sort keys %{$referenceids}) {
 		my $seqlength=$db->length("$ind_ref");
+		unless (defined $seqlength and $seqlength=~/^\d+$/ and $seqlength>0) {
+			die "Error: invalid seq length2: SeqID ", $ind_ref, "\n";
+		}
 		my $outfile;
 		if (exists $outcode{'10'}) {
 			($outfile=$ind_ref)=~s/\|/_/g;

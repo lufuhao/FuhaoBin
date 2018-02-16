@@ -10,8 +10,8 @@ use constant USAGE=><<EOH;
 
 SYNOPSIS:
 
-perl $0 --input my.fa [Options]
-Version: LUFUHAO20171110
+perl $0 [Options]
+Version: LUFUHAO20180212
 
 Requirements:
     Programs: MUMmer v3.23, quickmerge, seqtk
@@ -37,12 +37,15 @@ Options:
         Min alignment length for delta-filter
     --prefix | -p
         Output prefix
+    --genome | -g
+        Reference genome file in fasta [Optional]
     --verbose
         Detailed output for trouble-shooting;
     --version|v!
         Print current SCRIPT version;
 
 Example:
+	show-coords -l -r -T -c my.delta > my.delta.coords
 	perl $0 
 
 Author:
@@ -60,7 +63,7 @@ die USAGE unless @ARGV;
 
 ###Receving parameter################################################
 my ($help, $verbose, $debug, $version);
-my ($input, $queryfasta, $referencefasta, $percentage, $alignlen, $prefix);
+my ($input, $queryfasta, $referencefasta, $percentage, $alignlen, $prefix, $genome_fasta);
 
 GetOptions(
 	"help|h!" => \$help,
@@ -70,6 +73,7 @@ GetOptions(
 	"identity|d:s" => \$percentage,
 	"alignlen|l:i" => \$alignlen,
 	"prefix|p:s" => \$prefix,
+	"genome |g" => \$genome_fasta,
 	"debug!" => \$debug,
 	"verbose!" => \$verbose,
 	"version|v!" => \$version) or die USAGE;
@@ -89,10 +93,6 @@ my %rfn2qry=();
 my %qry2rfn=();
 my %final_rfn2qry=();
 my %final_qry2rfn=();
-my $nucmer_option=" -c 100 ";
-my $showcoords_options=" -r -l -T ";
-my $deltafilter_option=" -i 99.00 -r -q ";
-my $quickmerge_option="  -hco 5.0 -c 1.5 -l 5000 -ml 500 ";
 my $out_assembled="$prefix.assembled.fasta";
 $out_assembled=AddFilePath($out_assembled);
 my $out_not_assembled="$prefix.not.assembled.query.list";
@@ -100,9 +100,11 @@ $out_not_assembled=AddFilePath($out_not_assembled);
 my $out_rfn2qry="$prefix.assembled.rfn2qry";
 $out_rfn2qry=AddFilePath($out_rfn2qry);
 my $out_twice="$prefix.assembled.over-assembled";
+my $out_templist="$prefix.templist";
 $out_twice=AddFilePath($out_twice);
 my $total_runs=0;
 my $successful_runs=0;
+my $test_genome_plot=0;
 
 
 
@@ -133,6 +135,8 @@ unless (defined $queryfasta and -s $queryfasta) {
 unless (defined $referencefasta and -s $referencefasta) {
 	die "Error: invalid reference fasta\n";
 }
+($genome_fasta)=AddFilePath($genome_fasta);
+$test_genome_plot=1 if (defined $genome_fasta and -s $genome_fasta);
 unless (defined $percentage and $percentage=~/^\d+\.*\d*$/) {
 	die "Error: invalid percentage\n";
 }
@@ -160,7 +164,10 @@ print "Final rfn2qry: $out_rfn2qry\n";
 print "OverAssembled: $out_twice\n";
 
 
-
+my $nucmer_option=" -c 65 ";
+my $showcoords_options=" -r -l -T ";
+my $deltafilter_option=" -i 99.00 -r -q ";
+my $quickmerge_option="  -hco 5.0 -c 1.5 -l 1000 -ml 500 ";
 ### Main ############################################################
 open (COORDFILE, "< $input") || die "Error: Can not open nucmer coord input\n";
 <COORDFILE>;<COORDFILE>;<COORDFILE>;<COORDFILE>;### ignore first 4 header line
@@ -204,7 +211,7 @@ unless (-s "$referencefasta.fai") {
 }
 open (OUTASSEM, " > $out_assembled") || die "Error: can not write assembled output: $out_assembled\n";
 open (OUTRFN2QRY, " > $out_rfn2qry") || die "Error: can not write rfn2qry: $out_rfn2qry\n";
-
+open (TEMPLIST, " > $out_templist ") || die "Error: can not write temp list: $out_templist\n";
 foreach my $ref (sort keys %rfn2qry) {
 	$foldername++;
 	$total_runs++;
@@ -214,6 +221,7 @@ foreach my $ref (sort keys %rfn2qry) {
 	DeletePath "$curdir/$foldername" if (-d "$curdir/$foldername");
 	mkdir "$curdir/$foldername",0766 || die "Error: can not create dir: $foldername";
 	chdir "$curdir/$foldername" || die "Error: can not change dir: $curdir/$foldername\n";
+	print TEMPLIST $foldername;
 
 ### Defined out
 	my $rawquerylist="$curdir/$foldername/$foldername.query.list";
@@ -234,6 +242,7 @@ foreach my $ref (sort keys %rfn2qry) {
 		next;
 	}
 	print LISTREF $ref, "\n";
+	print TEMPLIST "\t", $ref;
 	close LISTREF;
 	unless (&GetSubSeq($referencefasta, $rawreffa, $rawreflist, 1)) {
 		print STDERR "Warnings: failed to extract reference fa: $ref\n";
@@ -257,9 +266,11 @@ foreach my $ref (sort keys %rfn2qry) {
 	my $numqry1=0;
 	foreach (sort keys %{$rfn2qry{$ref}}) {
 		print LISTQUERY $_, "\n";
+		print TEMPLIST "\t", $_;
 		$numqry1++;
 	}
 	close LISTQUERY;
+	print TEMPLIST "\n";
 	if ($numqry1>0) {
 		unless (&GetSubSeq($queryfasta, $rawqueryfa, $rawquerylist, $numqry1)) {
 			print STDERR "Warnings: failed to extract query fa: $ref\n";
@@ -306,13 +317,17 @@ foreach my $ref (sort keys %rfn2qry) {
 	}
 
 ### Test
-	if ($verbose) {
+	if (0 and $test_genome_plot) {
 		unless (MergeFiles($rawmerged, $rawqueryfa, $rawreffa)) {
 			print STDERR "Error: merge files failed\n";
 			next;
 		}
 		if (-s $rawmerged) {
-			unless (&RunMummerplot($rawassemble, $rawmerged, "$curdir/$foldername/$foldername.run2")) {
+#			unless (&RunMummerplot($rawassemble, $rawmerged, "$curdir/$foldername/$foldername.run2")) {
+#				print STDERR "Error: RunMummerplot running failed 2: $ref\n";
+#				next;
+#			}
+			unless (&RunMummerplot($$genome_fasta, $rawmerged, "$curdir/$foldername/$foldername.contig2scaf")) {
 				print STDERR "Error: RunMummerplot running failed 2: $ref\n";
 				next;
 			}
@@ -498,6 +513,7 @@ foreach my $ref (sort keys %rfn2qry) {
 }
 close OUTASSEM;
 close OUTRFN2QRY;
+close TEMPLIST;
 
 
 
@@ -580,14 +596,25 @@ sub RunMummerplot {
 	unless (exec_cmd_return("delta-filter $deltafilter_option $RMpfx.delta > $RMpfx.rq.delta 2> /dev/null")) {
 		print STDERR $RMsubino, "Error: delta-filter running failed 3\n";
 	}
-	if ($verbose) {
-		unless (exec_cmd_return("show-coords  $showcoords_options $RMpfx.rq.delta > $RMpfx.rq.delta.coord 2> /dev/null")) {
-			print STDERR $RMsubino, "Error: show-coords running failed\n";
+	if (1) {### Test ###
+		unless (exec_cmd_return("delta-filter -i 99 -l 300 $RMpfx.delta > $RMpfx.99.delta 2> /dev/null")) {
+			print STDERR $RMsubino, "Error: delta-filter running failed 3\n";
+		}
+		unless (exec_cmd_return("show-coords  -l -c -r -T $RMpfx.99.delta > $RMpfx.99.delta.coord 2> /dev/null")) {
+			print STDERR $RMsubino, "Error: show-coords running failed1\n";
+		}
+		unless (exec_cmd_return("mummerplot --layout --large --postscript -p $RMpfx.99 $RMpfx.99.delta > /dev/null 2>&1")) {
+			print STDERR $RMsubino, "Error: mummerplot running failed 3\n";
 		}
 	}
-	if (1) {
+	if ($verbose) {
+		unless (exec_cmd_return("show-coords  $showcoords_options $RMpfx.rq.delta > $RMpfx.rq.delta.coord 2> /dev/null")) {
+			print STDERR $RMsubino, "Error: show-coords running failed2\n";
+		}
+	}
+	if (0) {
 		unless (exec_cmd_return("mummerplot --layout --large --postscript -p $RMpfx.rq $RMpfx.rq.delta > /dev/null 2>&1")) {
-			print STDERR $RMsubino, "Error: mummerplot running failed 3\n";
+			print STDERR $RMsubino, "Error: mummerplot running failed 4\n";
 		}
 	}
 	return 1;

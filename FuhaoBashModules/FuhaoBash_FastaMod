@@ -67,3 +67,54 @@ FastaExtractSeqtk () {
 	
 	return 0;
 }
+
+
+### Extract fasta by a file of read ID list
+SeqTkSubSeqFasta () {
+	local SSFfastain=$1;
+	local SSFidlist=$2;
+	local SSFfastaout=$3;
+	local SSFsubinfo='SUB(SeqTkSubSeqFasta)';
+	
+	local SSFnumberlist=0;
+	local SSFnumberout=0;
+	local SSFfa_line_width=70;
+	
+	if [ -z "$SSFfastain" ] || [ ! -s "$SSFfastain" ]; then
+		echo "${SSFsubinfo}Error: invalid input fasta: $SSFfastain" >&2
+		return 1;
+	fi
+	if [ -z "$SSFidlist" ] || [ ! -s "$SSFidlist" ]; then
+		echo "${SSFsubinfo}Error: invalid fasta ID list: $SSFidlist" >&2
+		return 1;
+	fi
+	if [ -z "$SSFfastaout" ]; then
+		echo "${SSFsubinfo}Error: invalid fasta ID list: $SSFfastaout" >&2
+		return 1;
+	fi
+	if [ -e $SSFfastaout ]; then
+		rm -rf $SSFfastaout >/dev/null 2>/dev/null
+	fi
+	
+	seqtk subseq -l $SSFfa_line_width $SSFfastain $SSFidlist > $SSFfastaout
+	if [ $? -ne 0 ] || [ ! -s $SSFfastaout ]; then
+		echo "${SSFsubinfo}Error: seqtk subseq fasta error" >&2
+		echo "${SSFsubinfo}CMD used: seqtk subseq -l 70 $SSFfastain $SSFidlist > $SSFfastaout" >&2
+		return 1;
+	fi
+	
+	SSFnumberlist=$(wc -l $SSFidlist)
+	SSFnumberout=$(perl -ne 'BEGIN{$linnum=0;} $linenum++ if (/^>/); END {print $linenum, "\n";}' < $SSFfastaout)
+
+	if [ -z "$SSFnumberlist" ] || [ $SSFnumberlist -eq 0 ] || [ $SSFnumberlist -ne $SSFnumberout ]; then
+		echo "${SSFsubinfo}Error: seqtk lineout partially failed" >&2
+		echo "${SSFsubinfo}        Total number of IDs to extract:   $SSFnumberlist" >&2
+		echo "${SSFsubinfo}        Total number of R1 IDs extracted: $SSFnumberout" >&2
+		return 1;
+	else
+		echo "${SSFsubinfo}Info: seqtk subseq secceeded"
+		echo "${SSFsubinfo}        Total number of IDs to extract:   $SSFnumberlist"
+	fi
+
+	return 0;
+}

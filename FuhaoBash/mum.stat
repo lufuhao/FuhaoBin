@@ -35,10 +35,10 @@ Options:
   -h    Print this help message
   -q    Query sequence file in Fasta format
   -r    Reference sequence file in Fasta format
-  -i    Minimum percentage
-  -c    nucmer -c min_cluster
-  -l    delta-filter -l min alignment length
-  -o    Prefix for PNG file, Default: output
+  -i    Minimum percentage [0]
+  -c    nucmer -c min_cluster [100]
+  -l    delta-filter -l min alignment length [100]
+  -o    Prefix for PNG file [output]
 
 
 Example:
