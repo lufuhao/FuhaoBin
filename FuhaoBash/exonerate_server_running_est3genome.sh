@@ -20,12 +20,12 @@ echo "ProgName: $ProgramName"
 
 $0 --- running exonerate in server mode
 
-Version: 20170707
+Version: 20180226
 
 Requirements:
   Linux: perl, grep
   Script: 
-      fasta_splitter_by_numseq.pl
+      fasta_splitter.pl
       exonerate_gff2_to_gff3.pl
   Exonerate
 
@@ -138,8 +138,8 @@ if [ $(CmdExists 'grep') -ne 0 ]; then
 	echo "${ProgramName} Error: CMD 'grep' not found." >&2 
 	exit 127
 fi
-if [ $(CmdExists 'fasta_splitter_by_numseq.pl') -ne 0 ]; then
-	echo "${ProgramName} Error: script 'fasta_splitter_by_numseq.pl' not found." >&2 
+if [ $(CmdExists 'fasta_splitter.pl') -ne 0 ]; then
+	echo "${ProgramName} Error: script 'fasta_splitter.pl' not found." >&2 
 	exit 127
 fi
 if [ $(CmdExists 'exonerate') -ne 0 ] ; then
@@ -262,7 +262,7 @@ if [ -d "$rundir/split" ]; then
 else
 	mkdir -p $rundir/split
 	cd $rundir/split
-	fasta_splitter_by_numseq.pl $opt_i $opt_n $opt_p
+	fasta_splitter.pl -i $opt_i -n $opt_n -p $opt_p
 fi
 
 

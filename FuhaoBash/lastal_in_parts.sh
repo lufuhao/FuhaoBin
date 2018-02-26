@@ -22,7 +22,7 @@ cat<<HELP
 
 $0 --- Align large genome to reference by spliting into parts and merge back
 
-Version: 20170711
+Version: 20180226
 
 Requirements:
 	perl && File::Spec
@@ -56,9 +56,9 @@ Example:
   lastdb -cR11 -m1111110 human human.fa
   lastal -q3 -e35 -m50 human chimp.fa | last-split -m1 > out.maf
   
-  lastal_in_parts.sh -x $rundir/$lastdb_index -l 10000000 -i $queryseq \
-      -o chr3Bbac.last.chr3Bnegene.psl -a 10000001\
-      -p "-f MAF -Q 0 -p $scoremetrix -P $threads -M" 
+  lastal_in_parts.sh -x \$rundir/\$lastdb_index -l 10000000 -i \$queryseq \\
+      -o chr3Bbac.last.chr3Bnegene.psl -a 10000001 \\
+      -p "-f MAF -Q 0 -p \$scoremetrix -P \$threads -M" 
 
 Author:
   Fu-Hao Lu

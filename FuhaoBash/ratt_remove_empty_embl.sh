@@ -22,7 +22,7 @@ cat<<HELP
 
 $0 --- Brief Introduction
 
-Version: 20170324
+Version: 20180226
 
 Requirements:
 
@@ -60,7 +60,7 @@ if [ ! -d $newdir ]; then
 fi
 
 
-for emblfile in `find $embldir/ -name *.final.embl -type f`; do
+for emblfile in `find $embldir/ -name "*.embl" -type f`; do
 #	echo $emblfile
 	ftlines=0
 	ftlines=$(grep ^'FT' $emblfile | wc -l)
@@ -68,7 +68,7 @@ for emblfile in `find $embldir/ -name *.final.embl -type f`; do
 #		echo "$ftlines lines"
 #	fi
 	if [ $ftlines -lt 1 ]; then
-		mv ${emblfile%.final.embl}* $newdir
+		mv ${emblfile%.embl}* $newdir
 	fi
 done
 
