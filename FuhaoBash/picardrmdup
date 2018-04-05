@@ -1,0 +1,184 @@
+#!/bin/bash
+RunDir=$(cd `dirname $(readlink -f $0)`; pwd)
+MachType=$(uname -m)
+
+###HELP message########################
+help() {
+cat <<HELP
+
+picardrmdup [options] sorted_bam_file
+
+Version: 20161205
+
+Requirements:
+    \$PICARD_HOME or \$PICARDHOME
+    \PICARDHOME/MarkDuplicates.jar or \PICARDHOME/picard.jar
+    bamverify
+    samtools
+
+Descriptions:
+    Remove duplicates using Picard and then index
+
+Options:
+    -h    Print this help
+    -d    Delete temporary files
+    -k    Keep duplicates in BAM file
+
+Example:
+    picardrmdup sorted_bam_file
+    
+Output: 
+	filebase.rmdup.bam
+	filebase.rmdup.bam.bai
+
+Author:
+    Fu-Hao Lu
+    Post-Doctoral Scientist in Micheal Bevan laboratory
+    Cell and Developmental Department, John Innes Centre
+    Norwich NR4 7UH, United Kingdom
+    E-mail: Fu-Hao.Lu@jic.ac.uk
+
+HELP
+exit 0
+}
+[ -z "$1" ] && help
+[ "$1" = "-h" ] || [ "$1" = "--help" ] && help
+echo -e "\n######################\nProgram initializing ...\n######################\n"
+#echo "Adding $RunDir/bin into PATH"
+#export PATH=$RunDir/bin:$RunDir/utils/bin:$PATH
+
+
+#################### Defaults #######################################
+deletetemp=0
+keepduplicates=0
+declare -a bamlist=()
+
+#################### parameters #####################################
+while [ -n "$1" ];do
+  case "$1" in
+    -h) help;shift 1;;
+    -d) deletetemp=1; shift 1;;
+    -k) keepduplicates=1; shift 1;;
+    --) shift;break;;
+    -*) echo "Error: no this option $1. -h for help"; exit 1;;
+    *) bamlist+=("$1"); shift 1;;
+  esac
+done
+
+
+
+#################### Subfuctions ####################################
+###Detect command existence
+CmdExists () {
+  if command -v $1 >/dev/null 2>&1; then
+    echo 0
+  else
+#    echo "I require $1 but it's not installed.  Aborting." >&2
+    echo 1
+  fi
+#  local cmd=$1
+#  if command -v $cmd >/dev/null 2>&1;then
+#    echo >&2 $cmd "  :  "`command -v $cmd`
+#    exit 0
+#  else
+#    echo >&2 "Error: require $cmd but it's not installed.  Exiting..."
+#    exit 1
+#  fi
+}
+
+
+
+#################### Command test ###################################
+if [ $(CmdExists 'bamverify') -eq 1 ]; then
+	echo "Error: script 'bamverify' is required but not found.  Aborting..." >&2 
+	exit 127
+fi
+if [ $(CmdExists 'samtools') -eq 1 ]; then
+	echo "Error: CMD 'samtools' is required but not found.  Aborting..." >&2 
+	exit 127
+fi
+if [ $(CmdExists 'java') -eq 1 ]; then
+	echo "Error: PROGRAM 'java' is required but not found.  Aborting..." >&2 
+	exit 127
+fi
+
+if [ $(CmdExists 'picard') -eq 0 ]; then
+	cmdpicard='picard MarkDuplicates '
+else
+	path2picard=''
+	if [ ! -z $PICARD_HOME ] && [ -d $PICARD_HOME ]; then
+		path2picard=$PICARD_HOME
+	elif [ ! -z $PICARDHOME ] && [ -d $PICARDHOME ]; then
+		path2picard=$PICARDHOME
+	else
+		echo "Error: invalid PICARD_HOME or PICARDHOME" >&2
+		exit 127
+	fi
+	
+	if [ -s $path2picard/picard.jar ]; then
+		cmdpicard="java -jar $path2picard/picard.jar MarkDuplicates "
+	elif [ -s $path2picard/MarkDuplicates.jar ]; then
+		cmdpicard="java -jar $path2picard/MarkDuplicates.jar "
+	else
+		echo "Error: can not find picard.jar or MarkDuplicates.jar in DIR $path2picard" >&2
+		exit 127
+	fi
+fi
+echo "PICARD cmd: $cmdpicard"
+
+
+
+#################### Main ###########################################
+for file in ${bamlist[@]}; do
+	if [ ! -s $file ]; then
+		echo "Error: invalid BAM input: $file"
+		exit 1
+	fi
+	echo "BAM2rmdup: $file"
+	echo "BAM2rmdup: $file" >&2
+	filename=${file##*/}
+	filebase=${filename%.*}
+	if [ ! -s "$file.bai" ]; then
+		samtools index $file
+		if [ $? -ne 0 ]; then
+			echo "Error: samtools index original BAM: $file" >&2
+			exit 10
+		fi
+	fi
+	echo "INPUT=$file OUTPUT=$filebase.rmdup.bam METRICS_FILE=$filebase.rmdup.metrix"
+	if [ $keepduplicates -eq 1 ]; then
+		$cmdpicard INPUT=$file OUTPUT=$filebase.rmdup.bam REMOVE_DUPLICATES=FALSE METRICS_FILE=$filebase.rmdup.metrix ASSUME_SORTED=TRUE VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+		if [ $? -ne 0 ]; then
+			echo "Error: picard running error: $?" >&2
+			exit 10
+		fi
+	elif [ $keepduplicates -eq 0 ]; then
+		$cmdpicard INPUT=$file OUTPUT=$filebase.rmdup.bam REMOVE_DUPLICATES=TRUE METRICS_FILE=$filebase.rmdup.metrix ASSUME_SORTED=TRUE VALIDATION_STRINGENCY=SILENT MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000
+		if [ $? -ne 0 ]; then
+			echo "Error: picard running error: $?" >&2
+			exit 10
+		fi
+	else
+		echo "Error: invalid -k $keepduplicates" >&2
+		exit 10;
+	fi
+	if [ $deletetemp -eq 1 ]; then
+		if [ -e $filebase.rmdup.metrix ]; then
+			rm $filebase.rmdup.metrix
+		fi
+	fi
+	if [ -s "$filebase.rmdup.bam" ]; then
+		bamverify $filebase.rmdup.bam
+		if [ $? -eq 0 ]; then
+			samtools index $filebase.rmdup.bam
+			if [ $? -ne 0 ] || [ ! -s $filebase.rmdup.bam.bai ]; then
+				echo "Error: picard rmdum index error: $filebase.rmdup.bam" >&2
+				exit 10
+			fi
+		fi
+	fi
+done
+
+
+
+exit 0
