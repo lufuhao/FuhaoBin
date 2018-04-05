@@ -36,6 +36,7 @@ Options:
   -h    Print this help message
   -i    embl_dir
   -o    out_dir
+  -v    Verbose mode
 
 Example:
   $0 -i embl_dir -o out_dir
@@ -59,12 +60,14 @@ echo -e "\n######################\nProgram $ProgramName initializing ...\n######
 #################### Initializing ###################################
 embldir=''
 gffdir=''
+outverbose=0
 #################### Parameters #####################################
 while [ -n "$1" ]; do
   case "$1" in
     -h) help;shift 1;;
     -i) embldir=$2;shift 2;;
     -o) gffdir=$2;shift 2;;
+    -v) outverbose=1;shift 1;;
     --) shift;break;;
     -*) echo "error: no such option $1. -h for help" >&2;exit 1;;
     *) break;;
@@ -96,6 +99,9 @@ fi
 
 
 #################### Inout and Output ###############################
+if [[ $outverbose -eq 1 ]]; then
+	echo "1. Check input path"
+fi
 if [ -z "$embldir" ]; then
 	embldir='./transfered'
 	echo "Info: using default input dir: $embldir"
@@ -106,6 +112,11 @@ else
 	exit 10;
 fi
 
+
+
+if [[ $outverbose -eq 1 ]]; then
+	echo "2. Check output path"
+fi
 if [ ! -z "$gffdir" ]; then
 	echo "Info: using specified output dir: $gffdir"
 else
@@ -116,7 +127,7 @@ fi
 if [ -d "$gffdir" ]; then
 	echo "    * Existing output dir"
 	echo "    * Cleaning output dir"
-	rm -rf "$gffdir"/* > /dev/null 2>&1
+	rm -rf $gffdir/* > /dev/null 2>&1
 else
 	echo "    * Create output dir"
 	mkdir -p "$gffdir"
@@ -124,8 +135,13 @@ fi
 
 
 
-
+if [[ $outverbose -eq 1 ]]; then
+	echo "3. embl to gff3"
+fi
 for emblfile in `find $embldir/ -name *.final.embl`; do
+	if [[ $outverbose -eq 1 ]]; then
+		echo $emblfile
+	fi
 	gff3file=${emblfile##*/}
 	echo -e "\n\n\n$gff3file"
 	embl2gff3.pl $emblfile $gffdir/$gff3file.gff3

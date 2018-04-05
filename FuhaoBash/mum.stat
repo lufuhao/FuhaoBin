@@ -23,7 +23,7 @@ cat<<HELP
 
 $0 --- Brief Introduction
 
-Version: 20171127
+Version: 20180326
 
 Requirements:
 	None
@@ -32,13 +32,15 @@ Descriptions:
 	Map short query to long reference and draw plots
 
 Options:
-  -h    Print this help message
-  -q    Query sequence file in Fasta format
-  -r    Reference sequence file in Fasta format
-  -i    Minimum percentage [0]
-  -c    nucmer -c min_cluster [100]
-  -l    delta-filter -l min alignment length [100]
-  -o    Prefix for PNG file [output]
+  -h  --  Print this help message
+  -q  []  Query sequence file in Fasta format
+  -r  []  Reference sequence file in Fasta format
+  -i  []  Minimum percentage [0]
+  -c  []  nucmer -c min_cluster [100]
+  -l  []  delta-filter -l min alignment length [100]
+  -x  []  [start:end] for mummerplot -x
+  -o  []  Prefix for PNG file [output]
+  -ps --  Output ps format
 
 
 Example:
@@ -69,6 +71,9 @@ opt_o='output'
 opt_i=0
 opt_c=100
 opt_l=100
+opt_x=''
+MummerplotOption=' --large '
+opt_outfmt='--png'
 #################### Parameters #####################################
 while [ -n "$1" ]; do
   case "$1" in
@@ -79,6 +84,8 @@ while [ -n "$1" ]; do
     -o) opt_o=$2;shift 2;;
     -c) opt_c=$2;shift 2;;
     -l) opt_l=$2;shift 2;;
+    -x) opt_x=$2;shift 2;;
+    -ps) opt_outfmt='--postscript';shift 1;;
     --) shift;break;;
     -*) echo "Error: no such option $1. -h for help" > /dev/stderr;exit 1;;
     *) break;;
@@ -171,7 +178,12 @@ if [ $? -ne 0 ] || [ ! -s "$opt_o.filter.q" ]; then
 fi
 echo -e "\n\n\n"
 echo "Step3: mummerplot..."
-mummerplot --large -p=$opt_o --png $opt_o.filter.q
+if [ -z "$opt_x" ]; then
+	MummerplotOption="$MummerplotOption"
+else
+	MummerplotOption="$MummerplotOption -x $opt_x "
+fi
+mummerplot $MummerplotOption -p=$opt_o $opt_outfmt  $opt_o.filter.q
 if [ $? -ne 0 ] || [ ! -s "$opt_o.png" ]; then
 	echo "Error3: mummerplot running or output error" >&2
 	exit 1

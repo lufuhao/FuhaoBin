@@ -30,7 +30,7 @@ cat<<HELP
 
 $0 --- merge Exonerate-mapped cDNA and CDS into GFF3
 
-Version: 201700816
+Version: 20180227
 
 Requirements:
 	Linux: grep, perl, cat
@@ -43,7 +43,7 @@ Descriptions:
 
 Options:
   -h    Print this help message
-  -i    list File
+  -i    GFF3 gene list file
   -n    cDNA GFF3
   -s    CDS GFF3
   -o    output GFF3
@@ -53,6 +53,9 @@ Options:
 
 Example:
   $0 -i my.gene.list -n cDNA.gff3 -s CDS.gff3 -o output.gff3
+
+  Gene list
+  grep -P "\tgene\t" xxx.gff3 | cut -f 9 | perl -lane 's/^.*ID=//; s/;.*$//; print;' | sort -u > genelist
 
   * test if there are repeats
   grep -P "\tmRNA\t" wheat2tauschii.list.gff3 | cut -f 9 | perl -lne 's/^.*ID=//;s/;.*$//;print;' | sort | uniq -cd
