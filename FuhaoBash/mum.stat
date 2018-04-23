@@ -178,12 +178,10 @@ if [ $? -ne 0 ] || [ ! -s "$opt_o.filter.q" ]; then
 fi
 echo -e "\n\n\n"
 echo "Step3: mummerplot..."
-if [ -z "$opt_x" ]; then
-	MummerplotOption="$MummerplotOption"
-else
+if [ ! -z "$opt_x" ]; then
 	MummerplotOption="$MummerplotOption -x $opt_x "
 fi
-mummerplot $MummerplotOption -p=$opt_o $opt_outfmt  $opt_o.filter.q
+mummerplot $MummerplotOption -p $opt_o $opt_outfmt  $opt_o.filter.q
 if [ $? -ne 0 ] || [ ! -s "$opt_o.png" ]; then
 	echo "Error3: mummerplot running or output error" >&2
 	exit 1
