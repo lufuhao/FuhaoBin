@@ -1,0 +1,80 @@
+#!/usr/bin/Rscript
+#########################################################
+### A) Installing and loading required packages
+#########################################################
+
+if (!require("gplots")) {
+   install.packages("gplots", dependencies = TRUE)
+   library(gplots)
+   }
+if (!require("RColorBrewer")) {
+   install.packages("RColorBrewer", dependencies = TRUE)
+   library(RColorBrewer)
+   }
+
+
+#########################################################
+### B) Reading in data and transform it into matrix format
+#########################################################
+
+#data <- read.csv("heatmaps_in_r.csv", comment.char="#")
+#rnames <- data[,1]                            # assign labels in column 1 to "rnames"
+#mat_data <- data.matrix(data[,2:ncol(data)])  # transform column 2-5 into a matrix
+#rownames(mat_data) <- rnames                  # assign row names
+
+data <- read.table("heatmaps_in_r.txt", sep="\t", header = TRUE, row.names = 1)
+mat_data <-  as.matrix(data)
+#mat_data
+#names(mat_data)
+#names(mat_data)
+
+
+#########################################################
+### C) Customizing and plotting the heat map
+#########################################################
+
+
+
+# (optional) defines the color breaks manually for a "skewed" color transition
+col_breaks = c(seq(-10,-8,length=1),
+  seq(-7.99,-6,length=1),
+  seq(-5.99,-4,length=1),
+  seq(-3.99,3.99,length=1),
+  seq(4,5.99,length=1),
+  seq(6,7.99,length=1),
+  seq(8,10,length=1))
+
+# creates a own color palette from red to green
+#my_palette <- colorRampPalette(c("blue","dodgerblue4","cyan","grey","yellow","brown1","red"))(n = 99)
+my_palette <- colorRampPalette(c("blue","cyan","green","grey","yellow","brown1","red"))(length(col_breaks)-1)
+
+
+
+# creates a 5 x 5 inch image
+#png("heatmaps_in_r.png",    # create PNG for the heat map        
+#  width = 5*300,        # 5 x 300 pixels
+#  height = 5*300,
+#  res = 300,            # 300 pixels per inch
+#  pointsize = 8)        # smaller font size
+#postscript(file="heatmaps_in_r.eps", onefile=FALSE, horizontal=FALSE, width = 1000, height = 2000)
+
+svg(filename="heatmaps_in_r.svg", width=5, height=10, pointsize=12)
+
+
+
+
+
+heatmap.2(mat_data,
+#  cellnote = mat_data,  # same data set for cell labels
+  main = "Heatmap", # heat map title
+#  notecol="none",      # change font color of cell labels to black
+  density.info="none",  # turns off density plot inside color legend
+  trace="none",         # turns off trace lines inside the heat map
+  margins =c(5,5),     # widens margins around plot
+  col=my_palette,       # use on color palette defined earlier
+  breaks=col_breaks,    # enable color transition at specified limits
+  dendrogram="row",     # only draw a row dendrogram
+  Colv="NA",            # turn off column clustering
+)
+
+dev.off()               # close the PNG device

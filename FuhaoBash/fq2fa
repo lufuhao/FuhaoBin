@@ -1,0 +1,34 @@
+#!/bin/sh
+################# help message ######################################
+help()
+{
+cat<<HELP
+
+fq2fa fastq_file
+
+Version: 20141001
+
+Descriptions:
+    Convert fastq to fasta
+
+Options:
+  -h    Print this help message
+
+Example:
+  fq2fa xx.fq > xx.fa
+
+Author:
+  Fu-Hao Lu
+  Post-Doctoral Scientist in Micheal Bevan laboratory
+  Cell and Developmental Department, John Innes Centre
+  Norwich NR4 7UH, United Kingdom
+  E-mail: Fu-Hao.Lu@jic.ac.uk
+HELP
+exit 0
+}
+[ -z "$1" ] && help
+[ "$1" = "-h" ] && help
+#################### Defaults #######################################
+echo "$@"
+sed -n '1~4s/^@/>/p;2~4p' "$@"
+exit 0
