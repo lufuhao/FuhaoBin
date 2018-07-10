@@ -32,74 +32,69 @@ Arguments required: 1. sam or bam alignment file (must end in .bam or .sam) 2. F
 my $bamFile = shift;
 my $out = shift;
 my $outBam = $out.".bam";
-my $temp = $out.".sam";
 
 # only reads mapping with a quality of 10 will be considered
-if ($bamFile=~m/.bam$/){
-    die "cannot open $bamFile.\n" unless(open BAM,"samtools view -h -q 10 $bamFile |");
-}elsif($bamFile=~m/.sam$/){
-    die "cannot open $bamFile.\n" unless(open BAM,"samtools view -h -S -q 10 $bamFile |");
-}else{
-    die "Input alignment file is not a .sam or .bam file\n";
+if ($bamFile=~m/\.bam$/){
+	die "cannot open $bamFile.\n" unless(open BAM,"samtools view -h -q 10 $bamFile |");
+}
+elsif($bamFile=~m/\.sam$/){
+	die "cannot open $bamFile.\n" unless(open BAM,"samtools view -h -S -q 10 $bamFile |");
+}
+else{
+	die "Input alignment file is not a .sam or .bam file\n";
 }
 
-die "cannot open $temp.\n" unless(open TEMP,">$temp");
+die "Error: cannot write output\n" unless(open OUTBAM," | samtools view -b -h -S - > $outBam");
 
 my %flags=samFlags(); # this is a little sub that generates a hash with keys of 'unmapped', 'positive' and 'negative'; that is, if the read maps, and if so, to which strand, regardless of anything else.
 
 while(<BAM>){
-    chomp;  # removing new line
-    # adding the header lines (if you used -h in the samools command), we'll want it later, and going on to the reads
-    print TEMP $_."\n" if(/^(\@)/);
-    next if(/^(\@)/);
+	chomp;  # removing new line
+	# adding the header lines (if you used -h in the samools command), we'll want it later, and going on to the reads
+	print OUTBAM $_."\n" if(/^(\@)/);
+	next if(/^(\@)/);
 
-    my @line = split(/\t/);  # splitting SAM line into array
+	my @line = split(/\t/);  # splitting SAM line into array
 
-    # skip reads if both both pairs were not
-    # the specific read is unmapped,
-    # or map to the mitochondria.
-    next unless ($line[1] ~~ $flags{'properlyPaired'});
-    #next if($line[2] ~~ m/^chrM/ || $line[2] ~~ m/_random$/ || $line[2] ~~m/^chrUn/);
-    next if($line[2] ~~ m/_random$/ || $line[2] ~~m/^chrUn/);
-    if($line[8]==0){ # just in case
-	print STDERR $line[0]." has a length of 0\n$_\n"; # just in case
-    }
+	# skip reads if both both pairs were not
+	# the specific read is unmapped,
+	# or map to the mitochondria.
+	next unless ($line[1] ~~ $flags{'properlyPaired'});
+	#next if($line[2] ~~ m/^chrM/ || $line[2] ~~ m/_random$/ || $line[2] ~~m/^chrUn/);
+	next if($line[2] ~~ m/_random$/ || $line[2] ~~m/^chrUn/);
+	if($line[8]==0){ # just in case
+		print STDERR $line[0]." has a length of 0\n$_\n"; # just in case
+	}
 
-    if($line[1] ~~ $flags{'negative'}){ # if the read is mapped to the reverse strand
-	$line[7]=$line[7]+4; # move the mate start 4 bp
-	$line[8]=$line[8]+9; # adjust the inferred insert size
-	$line[9] =substr($line[9],0,-5); # remove 5 bp from the reads
-	$line[10] =substr($line[10],0,-5);# remove the 5bp from quality as well
+	if($line[1] ~~ $flags{'negative'}){ # if the read is mapped to the reverse strand
+		$line[7]=$line[7]+4; # move the mate start 4 bp
+		$line[8]=$line[8]-9; # adjust the inferred insert size
+		$line[9] =substr($line[9],0,-5); # remove 5 bp from the reads
+		$line[10] =substr($line[10],0,-5);# remove the 5bp from quality as well
+		# this is ugly, but this is a way to change the CIGAR to reflect that I'm shortening the read
+		# for the negative stran I want to subtract the 5p from the last entry (which should be M, for match)
+		$line[5] = &CIGARtrim($line[5],'-',5); # from the CIGAR string, trim 5, and we're on the negtive strand
+	}
+	elsif ($line[1] ~~ $flags{'positive'}){ # if the read is mapped to the positive strand
+		$line[3]=$line[3]+4; # move the start 4 bp
+		# these were removed, because they were incorrect, you don't actually move this end of the negative read (which this would be, because it's the mate of a positive strand read).
+		# for a negative read you just trim from the other end, the start position stays the same.
+		#$line[7]=$line[7]-5; # move the mate start 5 bp 
+		#$line[7]=1 if $line[7]<=0; # just to make sure we didn't go off the end
+		$line[8]=$line[8]-9; # adjust the inferred insert size
+		$line[9] =substr($line[9],4);# remove 4bp from the reads
+		$line[10] =substr($line[10],4);# remove the 4bp from quality as well
 
-	# this is ugly, but this is a way to change the CIGAR to reflect that I'm shortening the read
-	# for the negative stran I want to subtract the 5p from the last entry (which should be M, for match)
-	$line[5] = &CIGARtrim($line[5],'-',5); # from the CIGAR string, trim 5, and we're on the negtive strand
+		# this is ugly, but this is a way to change the CIGAR to reflect that I'm shortening the read
+		# for the positive strand I want to subtract the 4 from the first entry (which should be M, for match)
+		$line[5] = &CIGARtrim($line[5],'+',4); # from the CIGAR string, trim 4, and we're on the positive strand
+	}
 
-    }elsif($line[1] ~~ $flags{'positive'}){ # if the read is mapped to the positive strand
-	$line[3]=$line[3]+4; # move the start 4 bp
-	# these were removed, because they were incorrect, you don't actually move this end of the negative read (which this would be, because it's the mate of a positive strand read).
-	# for a negative read you just trim from the other end, the start position stays the same.
-	#$line[7]=$line[7]-5; # move the mate start 5 bp 
-	#$line[7]=1 if $line[7]<=0; # just to make sure we didn't go off the end
-	$line[8]=$line[8]-9; # adjust the inferred insert size
-	$line[9] =substr($line[9],4);# remove 4bp from the reads
-	$line[10] =substr($line[10],4);# remove the 4bp from quality as well
-
-	# this is ugly, but this is a way to change the CIGAR to reflect that I'm shortening the read
-	# for the positive strand I want to subtract the 4 from the first entry (which should be M, for match)
-	$line[5] = &CIGARtrim($line[5],'+',4); # from the CIGAR string, trim 4, and we're on the positive strand
-
-    }
-
-    print TEMP join("\t",@line)."\n";
+	print OUTBAM join("\t",@line)."\n";
 }
 
 close BAM;
-close TEMP;
-
-# convert the sam file to the bam file I want, and clean up
-`samtools view -Sb $temp > $outBam`;
-`rm $temp`;
+close OUTBAM;
 
 exit;
 
@@ -116,80 +111,84 @@ sub samFlags{
 	'positive' => [73,89,137,99,163,67,131,161,97,65,129],
 	'negative' => [121,153,185,147,83,115,179,81,145,113,177]
 	);
-    return (%flags);
+	return (%flags);
 }
 
 # this cuts off the first number and letter from a CIGAR string
 # and returns the trimmed CIGAR plus the number and letter trimmed off
 sub trimFirstCIGARunit{
-    my $cigar = shift;
-    my $firstChar = (split/\d+/, $cigar)[1];
-    #print STDERR "$cigar\n$firstChar\n";
-    my $firstNum = (split/$firstChar/, $cigar)[0];
-    my $length =length($firstNum.$firstChar);
-    return(substr($cigar,$length), $firstNum, $firstChar);
+	my $cigar = shift;
+	my $firstChar = (split/\d+/, $cigar)[1];
+	#print STDERR "$cigar\n$firstChar\n";
+	my $firstNum = (split/$firstChar/, $cigar)[0];
+	my $length =length($firstNum.$firstChar);
+	return(substr($cigar,$length), $firstNum, $firstChar);
 }
 
 # this cuts off the last number and letter from a CIGAR string
 # and returns the trimmed CIGAR plus the number and letter trimmed off
 sub trimLastCIGARunit{
-    my $cigar = shift;
-    my $lastChar = substr($cigar,-1); # split was acting weird, so this should grab the last character
-    my $lastNum = (split/[MINDS]/, $cigar)[-1]; # these are the possible letters equalling Match, Insert, N, Deletion, Shoft clip
-    my $length =length($lastNum.$lastChar);
-    return(substr($cigar,0,(-1*$length)), $lastNum, $lastChar);
+	my $cigar = shift;
+	my $lastChar = substr($cigar,-1); # split was acting weird, so this should grab the last character
+	my $lastNum = (split/[MINDS]/, $cigar)[-1]; # these are the possible letters equalling Match, Insert, N, Deletion, Shoft clip
+	my $length =length($lastNum.$lastChar);
+	return(substr($cigar,0,(-1*$length)), $lastNum, $lastChar);
 }
 
 # this will take a cigar string, the strand the read maps to and a number of reads to cut off
 # it returns the properly trimmed CIGAR string
 sub CIGARtrim{
-    my ($cigar, $strand, $num) = @_;
-    my $toReturn;
+	my ($cigar, $strand, $num) = @_;
+	my $toReturn;
 	if ($strand ~~ '-'){
-	    my ($cigarToKeep, $lastNum, $lastChar) = &trimLastCIGARunit($cigar);
-	    my $newLastNum = $lastNum - $num;
+		my ($cigarToKeep, $lastNum, $lastChar) = &trimLastCIGARunit($cigar);
+		my $newLastNum = $lastNum - $num;
 
-	    if ($lastChar ~~ 'D'){ # skip to the next letter because the deletion is completely skipped over
-		($cigarToKeep, $lastNum, $lastChar) = &trimLastCIGARunit($cigarToKeep);
-		$newLastNum = $lastNum - $num;
-	    }
-
-	    if ($newLastNum==0){
-		my $nextChar = substr($cigarToKeep,-1);
-		if ($nextChar ~~ 'D'){ # skip to the next letter because a read shouldn't end in a deletion
-		    ($cigarToKeep, $lastNum, $lastChar) = &trimLastCIGARunit($cigarToKeep);
+		if ($lastChar ~~ 'D'){ # skip to the next letter because the deletion is completely skipped over
+			($cigarToKeep, $lastNum, $lastChar) = &trimLastCIGARunit($cigarToKeep);
+			$newLastNum = $lastNum - $num;
 		}
-		$toReturn = $cigarToKeep;
-	    }elsif($newLastNum<0){ # Not everything has been trimmed off, so iterate over this again
-		$toReturn=&CIGARtrim($cigarToKeep,$strand,-1*$newLastNum);
-	    }else{
-		$toReturn=$cigarToKeep.$newLastNum.$lastChar;
-	    }
 
-	}elsif($strand ~~ '+'){
-	   # print STDERR "$cigar\n";
-	    my ($cigarToKeep, $firstNum, $firstChar) = &trimFirstCIGARunit($cigar);
-	    my $newFirstNum = $firstNum - $num;
-
-	    if ($firstChar ~~ 'D'){ # skip to the next letter because the deletion is completely skipped over
-		($cigarToKeep, $firstNum, $firstChar) = &trimFirstCIGARunit($cigarToKeep);
-		$newFirstNum = $firstNum - $num;
-	    }
-
-	    if ($newFirstNum==0){
-		my $nextChar = substr($cigarToKeep,-1);
-		if ($nextChar ~~ 'D'){ # skip to the next letter because a read shouldn't end in a deletion
-		    ($cigarToKeep, $firstNum, $firstChar) = &trimFirstCIGARunit($cigarToKeep);
+		if ($newLastNum==0){
+			my $nextChar = substr($cigarToKeep,-1);
+			if ($nextChar ~~ 'D'){ # skip to the next letter because a read shouldn't end in a deletion
+				($cigarToKeep, $lastNum, $lastChar) = &trimLastCIGARunit($cigarToKeep);
+			}
+			$toReturn = $cigarToKeep;
 		}
-		$toReturn = $cigarToKeep;
-	    }elsif($newFirstNum<0){ # Not everything has been trimmed off, so iterate over this again
-		$toReturn=&CIGARtrim($cigarToKeep,$strand,-1*$newFirstNum);
-	    }else{
-		$toReturn=$newFirstNum.$firstChar.$cigarToKeep;
-	    }
+		elsif($newLastNum<0){ # Not everything has been trimmed off, so iterate over this again
+			$toReturn=&CIGARtrim($cigarToKeep,$strand,-1*$newLastNum);
+		}
+		else{
+			$toReturn=$cigarToKeep.$newLastNum.$lastChar;
+		}
+	}
+	elsif($strand ~~ '+'){
+		# print STDERR "$cigar\n";
+		my ($cigarToKeep, $firstNum, $firstChar) = &trimFirstCIGARunit($cigar);
+		my $newFirstNum = $firstNum - $num;
 
-	}else{
-	    die ("strand in CIGARtrim must be '+' or '-'\n");
+		if ($firstChar ~~ 'D'){ # skip to the next letter because the deletion is completely skipped over
+			($cigarToKeep, $firstNum, $firstChar) = &trimFirstCIGARunit($cigarToKeep);
+			$newFirstNum = $firstNum - $num;
+		}
+
+		if ($newFirstNum==0){
+			my $nextChar = substr($cigarToKeep,-1);
+			if ($nextChar ~~ 'D'){ # skip to the next letter because a read shouldn't end in a deletion
+				($cigarToKeep, $firstNum, $firstChar) = &trimFirstCIGARunit($cigarToKeep);
+			}
+			$toReturn = $cigarToKeep;
+		}
+		elsif($newFirstNum<0){ # Not everything has been trimmed off, so iterate over this again
+			$toReturn=&CIGARtrim($cigarToKeep,$strand,-1*$newFirstNum);
+		}
+		else{
+			$toReturn=$newFirstNum.$firstChar.$cigarToKeep;
+		}
+	}
+	else{
+		die ("strand in CIGARtrim must be '+' or '-'\n");
 	}
 	return ($toReturn);
 }
