@@ -83,7 +83,6 @@ RunTrimGalore () {
 			mkdir -p $TrimGalore_OUT_PATH/nogroup
 		fi
 		fastqc $TrimGalore_OUT_PATH/$RTGfq1out -o $TrimGalore_OUT_PATH/nogroup -f fastq -t $numthreads --noextract --nogroup
-		
 		fastqc $TrimGalore_OUT_PATH/$RTGfq1out -o $TrimGalore_OUT_PATH/group -f fastq -t $numthreads --noextract
 		TrimGalore_out_fq1=$TrimGalore_OUT_PATH/$RTGfq1out
 	fi
