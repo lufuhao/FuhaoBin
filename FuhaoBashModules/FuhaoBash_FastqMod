@@ -23,21 +23,14 @@ FastqPairnessCheck () {
 	local FPCfqR2=$2
 	local FPCoutpfx=$3
 	
-	if [ -z "$Pairness_Out_Path" ]; then
-		Pairness_Out_Path="."
-	fi
-
-	if [ ! -d $Pairness_Out_Path ]; then
-		mkdir -p $Pairness_Out_Path
-	fi
-
-	cd $Pairness_Out_Path
+	local FPCsubinfo="FuhaoBash_FastqMod(FastqPairnessCheck)"
+	
 	fastq_checkid.pl $FPCfqR1 $FPCfqR2 '\@(\S+)\s*\S*'
 	if [ $? -eq 0 ]; then
-		echo "$FPCoutpfx paired"
+		echo "${FPCsubinfo}Info: $FPCoutpfx paired"
 		touch ${FPCoutpfx}_paired
 	else
-		echo "$FPCoutpfx un-paired" >&2
+		echo "${FPCsubinfo}Warnings: $FPCoutpfx un-paired" >&2
 		touch ${FPCoutpfx}_unpaired
 	fi
 	return 0
@@ -46,26 +39,28 @@ FastqPairnessCheck () {
 
 
 ### run Trim_Galore
-### RunTrimGalore (fq1gz, fq2gz, options)
+### RunTrimGalore (fq1gz, fq2gz, options, fqout1, fqout2)
 ### options="--paired --gzip --output_dir --quality 20 --phred33 --nextera --length 70"
 ### CMD: fastqc, trim_galore
-### Global: $numthreads, $TrimGalore_OUT_PATH
-### Output: $TrimGalore_out_fq1, $TrimGalore_out_fq2
+### Global: $numthreads
 RunTrimGalore () {
 	local RTGfq1=$1
 	local RTGfq2=$2
 	local RTGoption=$3
-	local RTGsubinfo="BashSUB(RunTrimGalore)"
+	local RTGfqout1=$4
+	local RTGfqout2=$5
+	local RTGsubinfo="FuhaoBash_FastqMod(RunTrimGalore)"
 
-	if [ -z "$TrimGalore_OUT_PATH" ]; then
-		TrimGalore_OUT_PATH=".";
+	local RTGoutdir1=$(dirname $RTGfqout1)
+	if [ ! -d $RTGoutdir1 ]; then
+		mkdir -p $RTGoutdir1
+	fi
+	local RTGoutdir2=$(dirname $RTGfqout2)
+	if [ ! -d $RTGoutdir2 ]; then
+		mkdir -p $RTGoutdir2;
 	fi
 	
-	if [ ! -d $TrimGalore_OUT_PATH ]; then
-		mkdir -p $TrimGalore_OUT_PATH
-	fi
-	
-	trim_galore $RTGoption --output_dir $TrimGalore_OUT_PATH $RTGfq1 $RTGfq2
+	trim_galore $RTGoption $RTGfq1 $RTGfq2
 	if [ $? -ne 0 ]; then
 		echo "${RTGsubinfo}Error: trim_galore running error" >&2
 		return 1
@@ -75,28 +70,27 @@ RunTrimGalore () {
 	RTGfq1out=$(echo "$RTGfq1out_base"| perl -lne 's/\.gz$//i;s/\.(fastq)|(fq)$//i;print $_, "_val_1.fq.gz";')
 	RTGfq2out_base=${RTGfq2##*/}
 	RTGfq2out=$(echo "$RTGfq2out_base"| perl -lne 's/\.gz$//i;s/\.(fastq)|(fq)$//i;print $_, "_val_2.fq.gz";')
-	if [ -s $TrimGalore_OUT_PATH/$RTGfq1out ]; then
-		if [ ! -d $TrimGalore_OUT_PATH/group ]; then
-			mkdir -p $TrimGalore_OUT_PATH/group
+	if [ -s $RTGfq1out ]; then
+		mv $RTGfq1out $RTGfqout1
+		if [ ! -d $RTGoutdir1/group ]; then
+			mkdir -p $RTGoutdir1/group
 		fi
-		if [ ! -d $TrimGalore_OUT_PATH/nogroup ]; then
-			mkdir -p $TrimGalore_OUT_PATH/nogroup
-		fi
-		fastqc $TrimGalore_OUT_PATH/$RTGfq1out -o $TrimGalore_OUT_PATH/nogroup -f fastq -t $numthreads --noextract --nogroup
-		fastqc $TrimGalore_OUT_PATH/$RTGfq1out -o $TrimGalore_OUT_PATH/group -f fastq -t $numthreads --noextract
-		TrimGalore_out_fq1=$TrimGalore_OUT_PATH/$RTGfq1out
+		fastqc $RTGfqout1 -o $RTGoutdir1/group -f fastq -t $numthreads --noextract
+#		if [ ! -d $RTGoutdir1/nogroup ]; then
+#			mkdir -p $RTGoutdir1/nogroup
+#		fi
+#		fastqc $RTGfqout1 -o $RTGoutdir1/nogroup -f fastq -t $numthreads --noextract --nogroup
 	fi
-	if [ -s $TrimGalore_OUT_PATH/$RTGfq2out ]; then
-		if [ ! -d $TrimGalore_OUT_PATH/group ]; then
-			mkdir -p $TrimGalore_OUT_PATH/group
+	if [ -s $RTGfq2out ]; then
+		mv $RTGfq2out $RTGfqout2
+		if [ ! -d $RTGoutdir2/group ]; then
+			mkdir -p $RTGoutdir2/group
 		fi
-		if [ ! -d $TrimGalore_OUT_PATH/nogroup ]; then
-			mkdir -p $TrimGalore_OUT_PATH/nogroup
-		fi
-		
-		fastqc $TrimGalore_OUT_PATH/$RTGfq2out -o $TrimGalore_OUT_PATH/nogroup -f fastq -t $numthreads --noextract --nogroup
-		fastqc $TrimGalore_OUT_PATH/$RTGfq2out -o $TrimGalore_OUT_PATH/group -f fastq -t $numthreads --noextract
-		TrimGalore_out_fq2=$TrimGalore_OUT_PATH/$RTGfq2out
+		fastqc $RTGfqout2 -o $RTGoutdir2/group -f fastq -t $numthreads --noextract
+#		if [ ! -d $RTGoutdir2/nogroup ]; then
+#			mkdir -p $RTGoutdir2/nogroup
+#		fi
+#		fastqc $RTGfqout2 -o $RTGoutdir2/nogroup -f fastq -t $numthreads --noextract --nogroup
 	fi
 	
 	return 0
@@ -105,56 +99,90 @@ RunTrimGalore () {
 
 
 ### trimmomatic
-### RunTrimmomatic(R1.fq[.gz], R2.fq[.gz], file_adaptors, Out_Prefix, path_trimmomatic)
-### Global: TRMMOMAT_OUT_PATH [./], numthreads
+### RunTrimmomatic(R1.fq[.gz], R2.fq[.gz], file_adaptors, path_trimmomatic, outfq1_paired, outfq2_paired, outprefix, outlog, Min_qual, Min_length)
+### Global: numthreads
 ### Program: fastqc
 ### Output: $Trimmomatic_out_fq1 $Trimmomatic_out_fq2
 RunTrimmomatic () {
 	local RMr1=$1
 	local RMr2=$2
 	local RMfile_adaptor=$3
-	local RMoutpfx=$4
-	local RMpath_trimmomatic=$5
-	local RMsubinfo="BashSUB(RunTrimmomatic)"
-	Trimmomatic_out_fq1=$TRMMOMAT_OUT_PATH/$RMoutpfx.R1.trim.fq
-	Trimmomatic_out_fq2=$TRMMOMAT_OUT_PATH/$RMoutpfx.R2.trim.fq
+	local RMpath_trimmomatic=$4
+	local RMoutfq1_paired=$5
+	local RMoutfq2_paired=$6
+	local RMoutpfx=$7
+	local RMmin_qual=$8
+	local RMmin_len=$9
+	
+	local RMsubinfo="FuhaoBash_FastqMod(RunTrimmomatic)"
+	local RMoutfq1_unpaired="$RMoutpfx.R1.unpaired.fq.gz"
+	local RMoutfq2_unpaired="$RMoutpfx.R2.unpaired.fq.gz"
+	local RMoutlog="$RMoutpfx.trimmomatic.log"
+	if [ -z "$RMmin_qual" ]; then
+		RMmin_qual=15
+	fi
+	if [ -z "$RMmin_len" ]; then
+		RMmin_len=90
+	fi
+	local RMpathdir1=$(dirname $RMoutfq1_paired)
+	if [ ! -d $RMpathdir1 ]; then
+		mkdir -p $RMpathdir1
+	fi
+	local RMpathdir2=$(dirname $RMoutfq2_paired)
+	if [ ! -d $RMpathdir2 ]; then
+		mkdir -p $RMpathdir2
+	fi
+	local RMpathdir3=$(dirname $RMoutfq1_unpaired)
+	if [ ! -d $RMpathdir3 ]; then
+		mkdir -p $RMpathdir3
+	fi
+	local RMpathdir4=$(dirname $RMoutfq2_unpaired)
+	if [ ! -d $RMpathdir4 ]; then
+		mkdir -p $RMpathdir4
+	fi
+	local RMpathdir5=$(dirname $RMoutlog)
+	if [ ! -d $RMpathdir5 ]; then
+		mkdir -p $RMpathdir5
+	fi
 #Parameters
-	local RMmin_qual=15
-	local RMmin_len=90
-	
-	if [ -z "$TRMMOMAT_OUT_PATH" ]; then
-		TRMMOMAT_OUT_PATH=".";
-	fi
-	
-	if [ ! -d $TRMMOMAT_OUT_PATH ]; then
-		mkdir -p $TRMMOMAT_OUT_PATH
-	fi
 	
 	echo "${RMsubinfo}Info: fastq R1        : $RMr1"
 	echo "${RMsubinfo}Info: fastq R2        : $RMr2"
 	echo "${RMsubinfo}Info: Adaptors        : $RMfile_adaptor"
-	echo "${RMsubinfo}Info: Out  Pfx        : $RMoutpfx"
 	echo "${RMsubinfo}Info: Trimmomatic path: $RMpath_trimmomatic"
+	echo "${RMsubinfo}Info: Min Qual        : $RMmin_qual"
+	echo "${RMsubinfo}Info: Min Length      : $RMmin_len"
 	
-	cd $TRMMOMAT_OUT_PATH
+	
 	java -jar $RMpath_trimmomatic PE -threads $numthreads -phred33 \
-	-trimlog $RMoutpfx.R1_R2.trimlog \
+	-trimlog $RMoutlog \
 	$RMr1 \
 	$RMr2 \
-	$Trimmomatic_out_fq1 $RMoutpfx.R1.unpaired.fq.gz \
-	$Trimmomatic_out_fq2 $RMoutpfx.R2.unpaired.fq.gz \
+	$RMoutfq1_paired $RMoutfq1_unpaired \
+	$RMoutfq2_paired $RMoutfq2_unpaired \
 	ILLUMINACLIP:"$RMfile_adaptor":2:30:10 LEADING:$RMmin_qual TRAILING:$RMmin_qual SLIDINGWINDOW:4:$RMmin_qual MINLEN:$RMmin_len
-	if [ ! -d $TRMMOMAT_OUT_PATH/group ]; then
-		mkdir -p $TRMMOMAT_OUT_PATH/group
+
+	if [ -s $RMoutfq1_paired ]; then
+		if [ ! -d $RMpathdir1/group ]; then
+			mkdir -p $RMpathdir1/group
+		fi
+		fastqc $RMoutfq1_paired -o $RMpathdir1/group -f fastq -t $numthreads --noextract
+#		if [ ! -d $RMpathdir1/nogroup ]; then
+#			mkdir -p $RMpathdir1/nogroup
+#		fi
+#		fastqc $RMoutfq1_paired -o $RMpathdir1/nogroup -f fastq -t $numthreads --noextract --nogroup
 	fi
-	if [ ! -d $TRMMOMAT_OUT_PATH/nogroup ]; then
-		mkdir -p $TRMMOMAT_OUT_PATH/nogroup
+	if [ -s $RMoutfq2_paired ]; then
+		if [ ! -d $RMpathdir2/group ]; then
+			mkdir -p $RMpathdir2/group
+		fi
+		fastqc $RMoutfq2_paired -o $RMpathdir2/group -f fastq -t $numthreads --noextract
+#		if [ ! -d $RMpathdir2/nogroup ]; then
+#			mkdir -p $RMpathdir2/nogroup
+#		fi
+#		fastqc $RMoutfq2_paired -o $RMpathdir2/nogroup -f fastq -t $numthreads --noextract --nogroup
 	fi
-	fastqc $Trimmomatic_out_fq1 -o $TRMMOMAT_OUT_PATH/nogroup -f fastq -t $numthreads --noextract --nogroup
-	fastqc $Trimmomatic_out_fq2 -o $TRMMOMAT_OUT_PATH/nogroup -f fastq -t $numthreads --noextract --nogroup
-	fastqc $Trimmomatic_out_fq1 -o $TRMMOMAT_OUT_PATH/group -f fastq -t $numthreads --noextract
-	fastqc $Trimmomatic_out_fq2 -o $TRMMOMAT_OUT_PATH/group -f fastq -t $numthreads --noextract
-	
+
 	return 0
 }
 

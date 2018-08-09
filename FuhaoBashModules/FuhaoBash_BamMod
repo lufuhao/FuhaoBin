@@ -21,7 +21,7 @@ BowtieMappingSingle () {
 	local BMSfq=$2
 	local BMSoptions=$3;
 	local BMSbamout=$4;
-	local BMSsubinfo='BowtieMappingSingle';
+	local BMSsubinfo='FuhaoBash_BamMod(BowtieMappingSingle)';
 	bowtie $BMSoptions $BMSindex $BMSfq  | samtools view -b -h -S -F 4 - > $BMSbamout.notsort.bam
 	if [ $? -ne 0 ] || [ ! -s $BMSbamout.notsort.bam ]; then
 		echo "${BMSsubinfo}Error: bowtie running failed" >&2
@@ -55,7 +55,7 @@ RunLastal () {
 	local RLindex=$2
 	local RLoutput=$3
 	local RLlastaloption=$4
-	local RLsubinfo="SH(RunLastal)"
+	local RLsubinfo="FuhaoBash_BamMod(RunLastal)"
 	
 	lastal $RLlastaloption $lastdb_index $RLquery > $RLquery.maf
 	if [ $? -ne 0 ]; then
@@ -79,4 +79,171 @@ RunLastal () {
 	fi
 	rm $RLquery.maf  > /dev/null 2>&1
 	return 0;
+}
+
+
+
+### map R1.fq and R2.fq to hisat2index
+### RunHisat2(Hisat2index, R1.fq, R2.fq, readgroup, outpfx)
+### Program: hisat2
+### Global: $numthreads
+RunHisat2 (){
+	local RHhisatindex=$1
+	local RHfastq1=$2
+	local RHfastq2=$3
+	local RHreadgroup=$4
+	local RHbamout=$5
+
+	local RHsubinfo='FuhaoBash_BamMod(RunHisat2)';
+	local RHpathout=$(dirname $RHbamout)
+	if [ ! -d $RHpathout ]; then
+		mkdir -p $RHpathout;
+	fi
+	
+	hisat2 -q -p $numthreads --fr --rg-id "$RHreadgroup" --rg "SM:$RHreadgroup" --rg "PL:Illumina" -x $RHhisatindex -1 $RHfastq1 -2 $RHfastq2 --dta -t | samtools view -b -h -S - > $RHbamout
+###	--novel-splicesite-outfile $outprefix.splicesites2.new \
+	if [ $? -ne 0 ] || [ ! -s $RHbamout.bam ]; then
+		echo "${RHsubinfo}Error: HiSat2 running failed" >&2
+		echo "CMD used: hisat2 -q -p $numthreads --fr --rg-id "$RHreadgroup" --rg "SM:$RHreadgroup" --rg "PL:Illumina" -x $RHhisatindex -1 $RHfastq1 -2 $RHfastq2 --dta -t | samtools view -b -h -S - > $RHbamout.bam" >&2
+		return 1;
+	fi
+	
+	return 0
+}
+
+
+
+### sort and index bam
+### BamSortIndex(in.bam, out.bam)
+### Program: samtools
+### Global: $numthreads
+BamSortIndex () {
+	local BSIbamin=$1
+	local BSIbamout=$2
+
+	local BSIsubinfo="FuhaoBash_BamMod(BamSortIndex)"
+
+	local BSIpathout=$(dirname $BSIbamout)
+	if [ ! -d $BSIpathout ]; then
+		mkdir -p $BSIpathout;
+	fi
+	if [ -e $BSIbamout ]; then
+		rm $BSIbamout;
+	fi
+
+	samtools sort -@ $numthreads $BSIbamin $BSIbamin.st
+	if [ $? -ne 0 ] || [ ! -s $BSIbamin.st.bam ]; then
+		echo "${BSIsubinfo}Error: Bam sort failed" >&2
+		echo "CMD used: samtools sort -@ $numthreads $BSIbamin $BSIbamin.st" >&2
+		return 1;
+	fi
+	if [ ! -s $BSIbamout ]; then
+		mv $BSIbamin.st.bam $BSIbamout
+	fi
+	samtools index $BSIbamout
+	if [ $? -ne 0 ]; then
+		echo "${BSIsubinfo}Error: Bam index failed" >&2
+		echo "CMD used: samtools index $BSIbamout" >&2
+		return 1;
+	fi
+
+	return 0
+}
+
+
+
+### run stringtring step1
+### RunStringtie1(in.bam, in.gtf, prefix, out.gtf)
+### Program: stringtie
+### Global: $numthreads
+RunStringtie1 () {
+	local RSbamin=$1
+	local RSgtfin=$2
+	local RSprefix=$3
+	local RSgtfout=$4
+
+	local RSsubinfo='FuhaoBash_BamMod(RunStringtie1)'
+	local RSpath_out=$(dirname $RSgtfout)
+	if [ ! -d $RSpath_out ]; then
+		mkdir -p $RSpath_out
+	fi
+	
+	echo "${RSsubinfo}Info: BAM file   : $RSbamin"
+	echo "${RSsubinfo}Info: GFF file   : $RSgtfin"
+	echo "${RSsubinfo}Info: Out prefix : $RSprefix"
+	echo "${RSsubinfo}Info: GTF OUT    : $RSgtfout"
+
+	stringtie $RSbamin -G $RSgtfin -p $numthreads -l $RSprefix -o $RSgtfout
+	if [ $? -ne 0 ]; then
+		echo "${RSsubinfo}Error: stringtie running failed" >&2
+		echo "CMD used: stringtie $RSbamin -G $RSgtfin -p $numthreads -l $RSprefix -o $RSgtfout" >&2
+		return 1;
+	fi
+
+	return 0
+}
+
+
+
+### run stringtring step2
+### RunStringtie2(gtffile, GTF.list, merged.gtf)
+### Program: stringtie
+### Global: $numthreads
+RunStringtie2 () {
+	local RSgtfin=$1
+	local RSgtflist=$2
+	local RSgtfout=$3
+	
+	local RSsubinfo='FuhaoBash_BamMod(RunStringtie2)'
+	local RSpath_out=$(dirname $RSgtfout)
+	if [ ! -d $RSpath_out ]; then
+		mkdir -p $RSpath_out
+	fi
+	
+	stringtie --merge -p $numthreads -G $RSgtfin -o $RSgtsout $RSgtflist
+	if [ $? -ne 0 ] || [ ! -s $RSgtsout ]; then
+		echo "${RSsubinfo}Error: stringtie merge error" >&2
+		echo "CMD used: stringtie --merge -p $numthreads -G $RSgtfin -o $RSgtsout $RSgtflist" >&2
+		return 1;
+	fi
+	
+	return 0;
+}
+
+
+
+
+### run stringtring step3
+### RunStringtie3(in.bam, merged.gtf, prefix, out.gtf)
+### Program: stringtie
+### Global: $numthreads
+RunStringtie3 () {
+	local RSbamin=$1
+	local RSgtfin=$2
+	local RSprefix=$3
+	local RSgtfout=$4
+	
+	local RSsubinfo='FuhaoBash_BamMod(RunStringtie3)'
+	local RSpath_out=$(dirname $RSgtfout)
+	if [ ! -d $RSpath_out ]; then
+		mkdir -p $RSpath_out
+	fi
+	
+	echo "${RSsubinfo}Info: BAM file   : $RSbamin"
+	echo "${RSsubinfo}Info: GFF file   : $RSgtfin"
+	echo "${RSsubinfo}Info: Out prefix : $RSprefix"
+	echo "${RSsubinfo}Info: GTF OUT    : $RSgtfout"
+
+	if [ ! -d $RSpath_out/$RSprefix ]; then
+		mkdir -p $RSpath_out/$RSprefix
+	fi
+
+	stringtie -e -b $RSpath_out/$RSprefix -p $numthreads -G $RSgtfin -o $RSgtfout -A  $RSpath_out/$RSprefix.gene.abundance.gtf -C $RSpath_out/$RSprefix.cov_ref.gtf $RSbamin
+	if [ $? -ne 0 ]; then
+		echo "${RSsubinfo}Error: stringtie2 running failed" >&2
+		echo "CMD used: stringtie -e -b $RSpath_out/$RSprefix -p $numthreads -G $RSgtfin -o $RSgtfout -A  $RSpath_out/$RSprefix.gene.abundance.gtf -C $RSpath_out/$RSprefix.cov_ref.gtf $RSbamin" >&2
+		return 1;
+	fi
+
+	return 0
 }
