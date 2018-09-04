@@ -14,10 +14,30 @@
 
 
 
+
+### run fastqc to 
+### FastqPairnessCheck(fq, options)
+### Program: fastqc
+### Global: $numthreads
+### Options: " --nogroup -o ./nogroup ", " -o ./group "
+### Note: ./nogroup or ./group must exists
+FastQCheck () {
+	FQCfastq=$1
+	FQCoptions=$2
+	
+	fastqc $FQCfastq -f fastq -t $numthreads --noextract $FQCoptions
+	if [ $? -ne 0 ]; then
+		return 100;
+	fi
+	
+	return 0
+}
+
+
 ### check read Pairness in fastq R1 and R2
 ### FastqPairnessCheck(R1.fq, R2.fq, outpfx)
 ### Program: fastq_checkid.pl
-### Global: Pairness_Out_Path [./]
+### Global:
 FastqPairnessCheck () {
 	local FPCfqR1=$1
 	local FPCfqR2=$2
@@ -40,7 +60,7 @@ FastqPairnessCheck () {
 
 ### run Trim_Galore
 ### RunTrimGalore (fq1gz, fq2gz, options, fqout1, fqout2)
-### options="--paired --gzip --output_dir --quality 20 --phred33 --nextera --length 70"
+### options="--paired --gzip --output_dir ./ --quality 20 --phred33 --nextera --length 70 --trim1"
 ### CMD: fastqc, trim_galore
 ### Global: $numthreads
 RunTrimGalore () {
@@ -50,6 +70,18 @@ RunTrimGalore () {
 	local RTGfqout1=$4
 	local RTGfqout2=$5
 	local RTGsubinfo="FuhaoBash_FastqMod(RunTrimGalore)"
+
+	RTGfq1out_base=${RTGfq1##*/}
+	RTGfq1out=$(echo "$RTGfq1out_base"| perl -lne 's/\.gz$//i;s/(\.fastq)|(\.fq)$//i;print $_, "_val_1.fq.gz";')
+	RTGfq2out_base=${RTGfq2##*/}
+	RTGfq2out=$(echo "$RTGfq2out_base"| perl -lne 's/\.gz$//i;s/(\.fastq)|(\.fq)$//i;print $_, "_val_2.fq.gz";')
+
+	echo "${RTGsubinfo}Error: Input Fq R1: $RTGfq1"
+	echo "${RTGsubinfo}Error: Input Fq R2: $RTGfq2"
+	echo "${RTGsubinfo}Error: Temp Fq R1: $RTGfq1out"
+	echo "${RTGsubinfo}Error: Temp Fq R2: $RTGfq2out"
+	echo "${RTGsubinfo}Error: Output Fq R1: $RTGfqout1"
+	echo "${RTGsubinfo}Error: Output Fq R2: $RTGfqout2"
 
 	local RTGoutdir1=$(dirname $RTGfqout1)
 	if [ ! -d $RTGoutdir1 ]; then
@@ -63,36 +95,40 @@ RunTrimGalore () {
 	trim_galore $RTGoption $RTGfq1 $RTGfq2
 	if [ $? -ne 0 ]; then
 		echo "${RTGsubinfo}Error: trim_galore running error" >&2
-		return 1
+		return 100
 	fi
 	
-	RTGfq1out_base=${RTGfq1##*/}
-	RTGfq1out=$(echo "$RTGfq1out_base"| perl -lne 's/\.gz$//i;s/\.(fastq)|(fq)$//i;print $_, "_val_1.fq.gz";')
-	RTGfq2out_base=${RTGfq2##*/}
-	RTGfq2out=$(echo "$RTGfq2out_base"| perl -lne 's/\.gz$//i;s/\.(fastq)|(fq)$//i;print $_, "_val_2.fq.gz";')
 	if [ -s $RTGfq1out ]; then
 		mv $RTGfq1out $RTGfqout1
-		if [ ! -d $RTGoutdir1/group ]; then
-			mkdir -p $RTGoutdir1/group
-		fi
-		fastqc $RTGfqout1 -o $RTGoutdir1/group -f fastq -t $numthreads --noextract
-#		if [ ! -d $RTGoutdir1/nogroup ]; then
-#			mkdir -p $RTGoutdir1/nogroup
+	fi
+	if [ -s $RTGfqout1 ]; then
+#		if [ ! -d $RTGoutdir1/group ]; then
+#			mkdir -p $RTGoutdir1/group
 #		fi
-#		fastqc $RTGfqout1 -o $RTGoutdir1/nogroup -f fastq -t $numthreads --noextract --nogroup
+#		fastqc $RTGfqout1 -o $RTGoutdir1/group -f fastq -t $numthreads --noextract
+		if [ ! -d $RTGoutdir1/nogroup ]; then
+			mkdir -p $RTGoutdir1/nogroup
+		fi
+		fastqc $RTGfqout1 -o $RTGoutdir1/nogroup -f fastq -t $numthreads --noextract --nogroup
+	else
+		return 100
 	fi
 	if [ -s $RTGfq2out ]; then
 		mv $RTGfq2out $RTGfqout2
-		if [ ! -d $RTGoutdir2/group ]; then
-			mkdir -p $RTGoutdir2/group
-		fi
-		fastqc $RTGfqout2 -o $RTGoutdir2/group -f fastq -t $numthreads --noextract
-#		if [ ! -d $RTGoutdir2/nogroup ]; then
-#			mkdir -p $RTGoutdir2/nogroup
-#		fi
-#		fastqc $RTGfqout2 -o $RTGoutdir2/nogroup -f fastq -t $numthreads --noextract --nogroup
 	fi
-	
+	if [ -s $RTGfqout2 ]; then
+#		if [ ! -d $RTGoutdir2/group ]; then
+#			mkdir -p $RTGoutdir2/group
+#		fi
+#		fastqc $RTGfqout2 -o $RTGoutdir2/group -f fastq -t $numthreads --noextract
+		if [ ! -d $RTGoutdir2/nogroup ]; then
+			mkdir -p $RTGoutdir2/nogroup
+		fi
+		fastqc $RTGfqout2 -o $RTGoutdir2/nogroup -f fastq -t $numthreads --noextract --nogroup
+	else
+		return 100
+	fi
+
 	return 0
 }
 

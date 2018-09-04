@@ -200,10 +200,10 @@ RunStringtie2 () {
 		mkdir -p $RSpath_out
 	fi
 	
-	stringtie --merge -p $numthreads -G $RSgtfin -o $RSgtsout $RSgtflist
-	if [ $? -ne 0 ] || [ ! -s $RSgtsout ]; then
+	stringtie --merge -p $numthreads -G $RSgtfin -o $RSgtfout $RSgtflist
+	if [ $? -ne 0 ] || [ ! -s $RSgtfout ]; then
 		echo "${RSsubinfo}Error: stringtie merge error" >&2
-		echo "CMD used: stringtie --merge -p $numthreads -G $RSgtfin -o $RSgtsout $RSgtflist" >&2
+		echo "CMD used: stringtie --merge -p $numthreads -G $RSgtfin -o $RSgtfout $RSgtflist" >&2
 		return 1;
 	fi
 	
