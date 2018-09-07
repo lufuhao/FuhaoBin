@@ -23,7 +23,7 @@ cat<<HELP
 
 $0 --- Brief Introduction
 
-Version: 20180326
+Version: 20180905
 
 Requirements:
 	None
@@ -182,7 +182,9 @@ if [ ! -z "$opt_x" ]; then
 	MummerplotOption="$MummerplotOption -x $opt_x "
 fi
 mummerplot $MummerplotOption -p $opt_o $opt_outfmt  $opt_o.filter.q
-if [ $? -ne 0 ] || [ ! -s "$opt_o.png" ]; then
+if [ $? -ne 0 ]; then
 	echo "Error3: mummerplot running or output error" >&2
 	exit 1
 fi
+
+exit 0;
