@@ -1,8 +1,10 @@
 #!/bin/bash
 ### bash modules
-###Descriptions:
+### Descriptions:
 #	cmd related subfunctions
 
+### Version
+# 20180911
 
 
 #Author:
@@ -14,13 +16,18 @@
 
 
 
+
+#$ command -v foo >/dev/null 2>&1 || { echo >&2 "I require foo but it's not installed.  Aborting."; exit 1; }  
+#$ type foo >/dev/null 2>&1 || { echo >&2 "I require foo but it's not installed.  Aborting."; exit 1; }  
+#$ hash foo 2>/dev/null || { echo >&2 "I require foo but it's not installed.  Aborting."; exit 1; } 
+
 ###Detect command existence
 CmdExists2 () {
   if command -v $1 >/dev/null 2>&1; then
-    echo 0
+    return 0
   else
 #    echo "I require $1 but it's not installed.  Aborting." >&2
-    echo 1
+    return 1
   fi
 #  local cmd=$1
 #  if command -v $cmd >/dev/null 2>&1;then
