@@ -55,7 +55,7 @@ Options:
   -i    BAM file
   -fai  genome fasta index input
   -bg   bedGraph output [BAMbase.bedGraph] or input [existing bedgraph file]
-  -r    Special regions: Chr1:1-1000
+  -r    Special chromosome: Chr3
   -o    bigwig output
 
 Example:
@@ -178,7 +178,8 @@ elif [ -s $opt_i ]; then
 		echo "Step1: Extracting Region: $opt_r"
 		BamFilter="$MyBamName.filter.bam"
 #		echo "samtools view -b -h $opt_i $opt_r > $BamFilter"
-		samtools view -b -h $opt_i $opt_r > $BamFilter
+#		samtools view -b -h $opt_i $opt_r > $BamFilter
+		(samtools view -H $opt_i; samtools view $opt_i | grep -P $opt_r'\t';) | samtools view -S -b -h - > $BamFilter
 		if [ $? -ne 0 ] || [ ! -s $BamFilter ]; then
 			echo "Step1 error: bedtools genomecov" >&2
 			echo "CMD used: samtools view -b -h $opt_i $opt_r > $BamFilter" >&2

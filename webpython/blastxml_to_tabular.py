@@ -3,6 +3,7 @@
 Designed to convert BLAST XML files into tabular BLAST output (either
 std for standard 12 columns, or ext for the extended 25 columns offered
 in the Galaxy BLAST+ wrappers).
+
 The 12 columns output are 'qseqid sseqid pident length mismatch gapopen qstart
 qend sstart send evalue bitscore' or 'std' at the BLAST+ command line, which
 mean:
