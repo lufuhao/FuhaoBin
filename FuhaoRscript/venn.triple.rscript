@@ -1,0 +1,17 @@
+library(grid);
+library(VennDiagram);
+venn.plot <- draw.triple.venn(
+area1=70.15,
+area2=71.96,
+area3=70.97, 
+n12=50.81, 
+n23=52.48,
+n13=52.80,
+n123=43.01,
+category=c("AA", "BB", "DD"), 
+fill=c("red","green","blue"),
+lty="blank",cex=2,cat.cex=2, cat.col=c("red","green","blue")
+);
+tiff(filename = "Triple_Venn_diagram.tiff", compression = "lzw");
+grid.draw(venn.plot);
+dev.off();

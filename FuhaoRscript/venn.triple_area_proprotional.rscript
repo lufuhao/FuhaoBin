@@ -1,0 +1,20 @@
+#Vennerable require graph RBGL grid lattice RColorBrewer reshape gtools xtable
+library(Vennerable)
+#x<-c(1:100)    #建立1~100的正整数集
+#y<-c(51:125)    #建立51~125的正整数集
+#data<-Venn(list("SetA"=x,"SetB"=y))    #使用Venn函数处理数据，完成了集合的命名并存入data（变量名可以随便起）
+
+###SetNames: 
+###Weights=(000, 100, 010, 110, 001, 101, 011, 111)
+venndata <- Venn(SetNames=c("AA","DD","BB"), Weight=c('000' = 12.92, '100' = 9.55, '010' = 8.70, '110' = 9.79, '001' = 11.67, '101' = 7.81, '011' = 9.48, '111' = 43.01))
+
+#pdf(“happlot.pdf”)
+#tiff(filename = "Triple_Venn_diagram.tiff", compression = "lzw");
+svg("Triple_Venn_diagram.svg")
+#doWeights= TRUE/FALSE)
+#doEmuler=TRUE/FALSE
+#type="squares"/"ChowRuskey"/"triangles"/"AWFE"/"circles"
+#plot(data,doWeight=T)
+plot(venndata, doWeights = TRUE, doEuler=TRUE, type="circles")
+dev.off()
+

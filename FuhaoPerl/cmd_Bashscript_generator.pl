@@ -92,6 +92,7 @@ while [ -n "$1" ]; do
     -h) help;shift 1;;
     -i) opt_i=$2;shift 2;;
     -t) opt_t=$2;shift 2;;
+    -1) seq_rfn=(${seq_rfn[@]} "$2");shift 2;;
     -s) opt_s=1;shift 1;;
     -a) opt_a=1;shift 1;;
     --) shift;break;;
@@ -119,6 +120,10 @@ CmdExists () {
 CmdExists \'santools\'
 if [ $? -ne 0 ]; then
 	echo "Error: CMD/script \'samtools\' in PROGRAM \'SAMtools\' is required but not found.  Aborting..." >&2 
+	exit 127
+fi
+if [[ $(CmdExists \'mum.stat\') -eq 1 ]]; then
+	echo "Error: script \'mum.stat\' is required but not found.  Aborting..." >&2 
 	exit 127
 fi
 

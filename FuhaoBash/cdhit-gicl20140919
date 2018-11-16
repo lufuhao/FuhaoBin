@@ -1,0 +1,168 @@
+#!/bin/sh
+RootDir=$(cd `dirname $0`; pwd)
+MachType=$(uname -m)
+if which cd-hit-est >/dev/null; then
+  echo "CDHIT found: "`which cd-hit-est`
+else
+  echo "CD-HIT NOT found"
+  exit 1
+fi
+
+if which gicl.pl >/dev/null; then
+  echo "gicl.pl found: "`which gicl.pl`
+  if which gicl.pl >/dev/null; then
+    echo "ace2fasta.pl found"`which ace2fasta.pl`
+  else
+    echo "ace2fasta.pl NOT found"
+    exit 1
+  fi
+  if which cdbyank >/dev/null; then
+    echo "cdbyank found: "`which cdbyank`
+  else
+    echo "cdbyank NOT found"
+    exit 1
+  fi
+else
+  echo "gicl.pl NOT found"
+  exit 1
+fi
+
+RunDir=$(pwd)
+echo "Output path: $RunDir"
+################# help message ######################################
+help()
+{
+cat<<HELP
+
+cdhit-gicl -i input.fa [OPTIONS]
+
+Version: 20140919
+
+Descriptions:
+  run cdhit and GICL pipeline
+
+Options:
+  -h    Print this help message
+CD-HIT
+  -i    Redundant fasta file
+  -o    output fasta file
+  -c    Sequence identity threshold, default 0.9
+  -n    Word_length, default 10
+  -t    Number of threads, default 1; with 0, all CPUs will be used
+  -r    1 or 0, default 1, by default do both +/+ & +/- alignments
+        if set to 0, only +/+ strand alignment
+  -m    Memory limit (in MB) for the program, default 800; 0 for unlimitted
+GICL
+  -u    Use the specified number of CPUs on local machine; default 1
+  -l    Miminum overlap length (default 40)
+  -p    Minimum percent identity for overlaps (default 94)
+  -v    Maximum length of unmatched overhangs (default 30)
+  -k    Lower-case masking in <fasta_db> sequences
+  -s    Number of sequences in a clustering search slice (default 1000)
+
+Example:
+  ngsimple -i ./chr1.fa -o fa
+
+Author:
+  Fu-Hao Lu
+  Post-Doctoral Scientist in Micheal Bevan laboratory
+  Cell and Developmental Department, John Innes Centre
+  Norwich NR4 7UH, United Kingdom
+  E-mail: Fu-Hao.Lu@jic.ac.uk
+HELP
+exit 0
+}
+[ -z "$1" ] && help
+[ "$1" = "-h" ] && help
+#################### Defaults #######################################
+echo -e "\n######################\ncdhit-GICL initializing ...\n######################\n"
+
+###Defaults##########################################################
+opt_c=0.9
+opt_n=10
+opt_t=0
+opt_r=1
+opt_m=800
+opt_u=1
+opt_l=40
+opt_p=94
+opt_v=30
+opt_k=1
+opt_s=1000
+opt_o=''
+
+#################### parameters #####################################
+while [ -n "$1" ]; do
+  case "$1" in
+    -h) help;shift 1;;
+    -i) opt_i=$2;shift 2;;
+    -o) opt_o=$2;shift 2;;
+    -c) opt_c=$2;shift 2;;
+    -n) opt_n=$2;shift 2;;
+    -t) opt_t=$2;shift 2;;
+    -r) opt_r=$2;shift 2;;
+    -m) opt_m=$2;shift 2;;
+    -u) opt_u=$2;shift 2;;
+    -l) opt_l=$2;shift 2;;
+    -p) opt_p=$2;shift 2;;
+    -v) opt_v=$2;shift 2;;
+    -s) opt_s=$2;shift 2;;
+    -k) opt_k=0;shift 1;;
+    --) shift;break;;
+    -*) echo "error: no such option $1. -h for help";exit 1;;
+    *) break;;
+  esac
+done
+
+if [ -e $opt_i ]; then
+  if [ ! -s $opt_i ]; then
+    echo "Error: empty input"
+    exit 1
+  fi
+else
+  echo "Error: invalid input, file not exists"
+  exit 1
+fi
+filename=${opt_i##*/}
+fileext=${filename##*.}
+filebasename=${filename%.*}
+
+if [ "x$opt_o" = "x" ];then
+  opt_o=$filebasename'_RemoveRedundancy.fa'
+fi
+
+if [ ! -d $RunDir/1.$filebasename.cdhit ]; then
+  mkdir -p $RunDir/$filebasename.cdhit
+else
+  rm -rf $RunDir/$filebasename.cdhit
+  mkdir -p $RunDir/$filebasename.cdhit
+fi
+cd $RunDir/$filebasename.cdhit
+echo "CMD: cd-hit-est -i $opt_i -c $opt_c -n $opt_n -T $opt_t -r $opt_r -M $opt_m -o $filebasename.cdhit.fa"
+cd-hit-est -i $opt_i -c $opt_c -n $opt_n -T $opt_t -r $opt_r -M $opt_m -o $filebasename.cdhit.fa
+
+if [ -s $RunDir/$filebasename.cdhit/$filebasename.cdhit.fa ]; then
+  if [ ! -d $RunDir/2.$filebasename.gicl ]; then
+    mkdir -p $RunDir/2.$filebasename.gicl
+  else
+    rm -rf $RunDir/2.$filebasename.gicl
+    mkdir -p $RunDir/2.$filebasename.gicl
+  fi
+else
+  echo "Error: CDHIT output error"
+  exit 1
+fi
+cd $RunDir/2.$filebasename.gicl
+if [ $opt_k -eq 1 ];then
+  echo "CMD: gicl.pl -c $opt_u -in $RunDir/$filebasename.cdhit/$filebasename.cdhit.fa -l $opt_l -p $opt_p -v $opt_v -mk -n $opt_s"
+  gicl.pl -c $opt_u -in $RunDir/$filebasename.cdhit/$filebasename.cdhit.fa -l $opt_l -p $opt_p -v $opt_v -mk -n $opt_s
+elif [ $opt_k -eq 0 ];then
+  echo "CMD: gicl.pl -c $opt_u -in $RunDir/$filebasename.cdhit/$filebasename.cdhit.fa -l $opt_l -p $opt_p -v $opt_v -n $opt_s"
+  gicl.pl -c $opt_u -in $RunDir/$filebasename.cdhit/$filebasename.cdhit.fa -l $opt_l -p $opt_p -v $opt_v -n $opt_s
+fi
+aceace2fasta.pl -o contigs.fa *.ace
+cat *.singletons | cdbyank $RunDir/2.cdhit/Paragon.cdhit.fa.cidx > singletons.fa
+cat contigs.fa singletons.fa > ../$filebasename.gicl.fa 
+cd $RunDir/
+echo "CDHIT-gicl finished"
+exit 0

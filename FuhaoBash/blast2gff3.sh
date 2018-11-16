@@ -60,6 +60,6 @@ fi
 ###################################################################
 for i in $@; do
 	echo $i
-	perl /usr/users/celldev/luf/local/perl/blast.filter.pl $i 250 $i.fil250
-	perl /usr/users/celldev/luf/local/perl/blast92gff3.pl < $i.fil250 > $i.fil250.gff3
+	blast.filter.pl $i 250 $i.fil250
+	blast92gff3.pl < $i.fil250 > $i.fil250.gff3
 done 

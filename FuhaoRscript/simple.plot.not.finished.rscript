@@ -1,0 +1,10 @@
+
+
+#If you want to see commands in output file
+options(echo=TRUE)
+args<-commandArgs(TRUE)
+
+
+mydata <- read.table(args[1], header=FALSE, skip=1, col.names=c("col1" "col2"), )
+
+mydata <- read.table ("/usr/users/celldev/luf/test/sspace/test.rmdup/3.depth/MyOutput.merge.rmdup.bam.depth.col3.bin1", header=FALSE, skip=1, col.names=c("Depth", "Count"), nrows=20)

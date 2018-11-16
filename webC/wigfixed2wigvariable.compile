@@ -1,0 +1,2 @@
+#!/bin/bash
+gcc -m64 -O3 -Wall -o wigfixed2wigvariable wigfixed2wigvariable.c
