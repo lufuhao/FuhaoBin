@@ -44,6 +44,7 @@ Options:
              11=embl per gene
              12=genome.with.up/downstream + corresponding GFF
                 Will output 9 and GFF3
+             13=embl in one file
           default:1,2,3,4
     --outdir | -d
         Output dir for OUTOPT 10-11; [./MyEMBL]
@@ -102,7 +103,7 @@ my $gene={};
 my $gene2mrna=();
 my %mergedregion=();
 my $exons={};
-
+my $printID=0;
 
 
 ### input and output ################################################
@@ -159,23 +160,37 @@ unlink "$outprefix.genome.with.updownstream$stream.fasta" if ((exists $outcode{'
 my $outfile_updownstream3000with = Bio::SeqIO->new( -format => 'fasta', -file => ">$outprefix.genome.with.updownstream$stream.fasta") if (exists $outcode{'9'} or exists $outcode{'12'});
 
 ### 10. 11.
-if (exists $outcode{'10'} and exists $outcode{'11'}) {
-	die "Error: can not specify options 10 and 11 at the same time\nSeparated running is recommended\n";
-}
-elsif (exists $outcode{'10'} or exists $outcode{'11'}) {
-	if ( -d $outdir) {
-		my @existingfiles=glob "$outdir/*";
-		if (scalar(@existingfiles)>0) {
-			die "Error: Outdir not empty\n";
+if (exists $outcode{'10'} or exists $outcode{'11'} or exists $outcode{'13'}) {
+	my $numembl=0;
+	$numembl++ if (exists $outcode{'10'});
+	$numembl++ if (exists $outcode{'11'});
+	$numembl++ if (exists $outcode{'13'});
+	unless ($numembl==1) {
+		die "Error: can not specify options 10/11/13 at the same time\nSeparated running is recommended\n";
+	}
+	if (exists $outcode{'10'} or exists $outcode{'11'}) {
+		if ( -d $outdir) {
+			my @existingfiles=glob "$outdir/*";
+			if (scalar(@existingfiles)>0) {
+				die "Error: Outdir not empty\n";
+			}
+		}
+		else {
+			mkdir $outdir, 0766 || die "Error: can not make dir $outdir\n";
 		}
 	}
-	else {
-		mkdir $outdir, 0766 || die "Error: can not make dir $outdir\n";
+	if (exists $outcode{'13'}) {
+		unlink "$outprefix.embl" if (-e "$outprefix.embl");
 	}
 }
+
+
+
 ### 12 . OUTGFF
 my $outputgff3="$outprefix.genome.with.updownstream$stream.gff3" if (exists $outcode{'12'});
 unlink $outputgff3 if (exists $outcode{'12'} and -e $outputgff3);
+### 13 EMBL in one file
+
 
 
 
@@ -551,30 +566,47 @@ if (exists $outcode{'2'} or exists $outcode{'4'}) {
 
 
 ### 3. gff2embl
-if (exists $outcode{'10'} or exists $outcode{'11'}) {
+
+if (exists $outcode{'10'} or exists $outcode{'11'} or exists $outcode{'13'}) {
+	open (EMBLOUT, " > $outprefix.temp.embl") if (exists $outcode{'13'});
 	print "\n\n### Info: output EMBL\n";
-	foreach my $ind_ref (sort keys %{$referenceids}) {
+	my @all_seqids=$db->get_all_primary_ids;
+	@all_seqids=sort @all_seqids;
+	foreach my $ind_ref (@all_seqids) {
+		if (exists $outcode{'10'} or exists $outcode{'11'}) {
+			next unless (exists ${$referenceids}{$ind_ref});
+		}
 		my $seqlength=$db->length("$ind_ref");
 		unless (defined $seqlength and $seqlength=~/^\d+$/ and $seqlength>0) {
 			die "Error: invalid seq length2: SeqID ", $ind_ref, "\n";
 		}
 		my $outfile;
-		if (exists $outcode{'10'}) {
-			($outfile=$ind_ref)=~s/\|/_/g;
+		if (exists $outcode{'10'} or exists $outcode{'13'}) {
+			if (exists $outcode{'10'}) {### write new file
+				($outfile=$ind_ref)=~s/\|/_/g;
+				close EMBLOUT if (defined fileno(EMBLOUT));
+				open (EMBLOUT, " > $outdir/$outfile.temp.embl ") 
+				  || die "Error: Can not write EMBL out: $outdir/$outfile.temp.embl\n";
+			}
+			
 #			print "Test: output filename: $outdir/$outfile.embl\n"; ### For test ###
-			close EMBLOUT if (defined fileno(EMBLOUT));
-			open (EMBLOUT, " > $outdir/$outfile.temp.embl ") || die "Error: Can not write EMBL out: $outdir/$outfile.temp.embl\n";
+			
 			&PrintEmbl('ID', "$ind_ref; SV1; linear; genomic DNA; STD; PLN; $seqlength BP.");
 			&PrintEmbl('AC', "$ind_ref;");
-			&PrintEmbl('FH');
 			&PrintEmbl('FH');
 			&PrintEmbl('FT', 'source', "1..".$seqlength);
 			&PrintEmbl('FT', '', "/mol_type=\"genomic DNA\"");
 		}
 		
+		if (exists ${$referenceids}{$ind_ref}) {
 		foreach my $ind_num (sort {$a <=> $b} keys %{${$referenceids}{$ind_ref}}) {
+### write gene
 			foreach my $ind_geneid (sort keys %{${$referenceids}{$ind_ref}{$ind_num}}) {
 				my ($cutstart, $cutend, $tobecut);
+				###Strand: ${$gene}{$ind_geneid}{'strand'}
+				unless (exists ${$gene}{$ind_geneid} and exists ${$gene}{$ind_geneid}{'strand'} and ${$gene}{$ind_geneid}{'strand'} =~/^(\+)|(\-)$/) {
+					die "Error: unknown strand GENE $ind_geneid\n";
+				}
 				if (exists $outcode{'11'}) {
 					$cutstart=${$gene}{$ind_geneid}{'start'}-$stream;
 					$cutstart=1 unless ($cutstart>0);
@@ -588,7 +620,6 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					&PrintEmbl('ID', "$outfile; SV1; linear; genomic DNA; STD; PLN; $seqlength BP.");
 					&PrintEmbl('AC', "$outfile;");
 					&PrintEmbl('FH');
-					&PrintEmbl('FH');
 					&PrintEmbl('FT', 'source', "1..".($cutend-$cutstart+1));
 					&PrintEmbl('FT', '', "/mol_type=\"genomic DNA\"");
 					if (${$gene}{$ind_geneid}{'strand'} eq '+') {
@@ -601,9 +632,9 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 						print STDERR "Warnings1: strand error: GENE $ind_geneid\n";
 						next;
 					}
-					&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
+					
 				}
-				if (exists $outcode{'10'}) {
+				if (exists $outcode{'10'} or exists $outcode{'13'}) {
 					if (${$gene}{$ind_geneid}{'strand'} eq '+') {
 						&PrintEmbl('FT', 'gene', ${$gene}{$ind_geneid}{'start'}."..".${$gene}{$ind_geneid}{'end'});
 					}
@@ -614,17 +645,25 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 						print STDERR "Warnings2:  strand error: GENE $ind_geneid\n";
 						next;
 					}
-					&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
 				}
-				
+				&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
+				if (exists ${$gene}{$ind_geneid}{'pseudogene'}) {
+					my $info_pseudo=${$gene}{$ind_geneid}{'pseudogene'};
+					$info_pseudo=~s/^"//;$info_pseudo=~s/"$//;
+					&PrintEmbl('FT', '', "/pseudogene=\"$info_pseudo\"");
+				}
+				if (exists ${$gene}{$ind_geneid}{'Ontology_term'}) {
+					my $info_ontology=${$gene}{$ind_geneid}{'Ontology_term'};
+					my @arr_ontology=split(/,/, $info_ontology);
+					foreach my $ind_ontology (sort @arr_ontology) {
+						$ind_ontology=~s/^"//;$ind_ontology=~s/"$//;
+						&PrintEmbl('FT', '', "/db_xref=\"$ind_ontology\"");
+					}
+				}
+### write mRNA
 				unless (exists ${$gene2mrna}{$ind_geneid}) {### check if gene got mrna
 					print STDERR "Warnings: GENE $ind_geneid no mRNAs\n";
 				}
-				###Strand: ${$gene}{$ind_geneid}{'strand'}
-				unless (${$gene}{$ind_geneid}{'strand'} =~/^(\+)|(\-)$/) {
-					die "Error: unknown strand GENE $ind_geneid\n";
-				}
-				
 				foreach my $ind_mrnaid (sort keys %{${$gene2mrna}{$ind_geneid}}) { 
 					###mRNA
 					my %uniqueexons=();
@@ -637,7 +676,7 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					}
 					my @mrnaexons=();
 					foreach my $exonnum (@{$exonarr}) {
-						if (exists $outcode{'10'}) {
+						if (exists $outcode{'10'} or exists $outcode{'13'}) {
 							push (@mrnaexons, ${$exonnum}[0].'..'.${$exonnum}[1]);
 						}
 						if (exists $outcode{'11'}) {
@@ -663,9 +702,9 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 #					&PrintEmbl('FT', '', "/note=\"transcript_id=$ind_mrnaid\"");
 					&PrintEmbl('FT', '', "/gene=\"$ind_geneid\"");
 					@mrnaexons=();
-					###exon
+###exon
 					foreach my $exonnum (@{$exonarr}) { 
-						if (exists $outcode{'10'}) {
+						if (exists $outcode{'10'} or exists $outcode{'13'}) {
 							if (${$gene}{$ind_geneid}{'strand'} eq '+') {
 								&PrintEmbl('FT', 'exon', ${$exonnum}[0].'..'.${$exonnum}[1]);
 							}
@@ -708,7 +747,7 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					}
 					if (scalar(@{$cdsarr})>0) {
 						foreach my $cdsnum (@{$cdsarr}) {
-							if (exists $outcode{'10'}) {
+							if (exists $outcode{'10'} or exists $outcode{'13'}) {
 								push (@mrnaexons, ${$cdsnum}[0].'..'.${$cdsnum}[1]);
 							}
 							if (exists $outcode{'11'}) {
@@ -749,9 +788,11 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 					}
 				}
 			}
+		}}
+		if (exists $outcode{'10'} or exists $outcode{'13'}) {
+			&PrintEmbl('SQ', $db->seq("$ind_ref"));
 		}
 		if (exists $outcode{'10'}) {
-			&PrintEmbl('SQ', $db->seq("$ind_ref"));
 			close EMBLOUT;
 			unless (-s "$outdir/$outfile.temp.embl") {
 				print STDERR "Error: EMBL temp failed: $outdir/$outfile.temp.embl\n";
@@ -761,6 +802,15 @@ if (exists $outcode{'10'} or exists $outcode{'11'}) {
 				print STDERR "Error: ReformatEmbl failed: $outdir/$outfile.temp.embl\n";
 				next;
 			}
+		}
+	}
+	if (exists $outcode{'13'}) {
+		close EMBLOUT;
+		unless (-s "$outprefix.temp.embl") {
+			die "Error: EMBL temp failed: $outprefix.temp.embl\n";
+		}
+		unless (&ReformatEmbl("$outprefix.temp.embl", "$outprefix.embl")) {
+			die "Error: ReformatEmbl failed: $outprefix.temp.embl\n";
 		}
 	}
 }
@@ -955,8 +1005,10 @@ sub ReformatEmbl {
 sub PrintEmbl {
 	my ($PElinestart, $PEstring, $PEnote)=@_;
 	if ($PElinestart=~/^(ID)|(AC)$/) {
+		print EMBLOUT "\n" if ($printID>0);
 		print EMBLOUT $PElinestart, ' ' x 3 , $PEstring, "\n";
 		print EMBLOUT "XX\n";
+		$printID++;
 	}
 	elsif ($PElinestart=~/^(DE)$/) {
 		print EMBLOUT $PElinestart, ' ' x 3 , $PEstring, "\n";
