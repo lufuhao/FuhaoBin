@@ -59,16 +59,17 @@ FastqPairnessCheck () {
 
 
 ### run Trim_Galore
-### RunTrimGalore (fq1gz, fq2gz, options, fqout1, fqout2)
+### RunTrimGalore (fq1gz, fq2gz, options, $numthreads, fqout1, fqout2)
 ### options="--paired --gzip --output_dir ./ --quality 20 --phred33 --nextera --length 70 --trim1"
 ### CMD: fastqc, trim_galore
-### Global: $numthreads
+### Global:
 RunTrimGalore () {
 	local RTGfq1=$1
 	local RTGfq2=$2
 	local RTGoption=$3
-	local RTGfqout1=$4
-	local RTGfqout2=$5
+	local RTGnumthreads=$4
+	local RTGfqout1=$5
+	local RTGfqout2=$6
 	local RTGsubinfo="FuhaoBash_FastqMod(RunTrimGalore)"
 
 	RTGfq1out_base=${RTGfq1##*/}
@@ -105,11 +106,11 @@ RunTrimGalore () {
 #		if [ ! -d $RTGoutdir1/group ]; then
 #			mkdir -p $RTGoutdir1/group
 #		fi
-#		fastqc $RTGfqout1 -o $RTGoutdir1/group -f fastq -t $numthreads --noextract
+#		fastqc $RTGfqout1 -o $RTGoutdir1/group -f fastq -t $RTGnumthreads --noextract
 		if [ ! -d $RTGoutdir1/nogroup ]; then
 			mkdir -p $RTGoutdir1/nogroup
 		fi
-		fastqc $RTGfqout1 -o $RTGoutdir1/nogroup -f fastq -t $numthreads --noextract --nogroup
+		fastqc $RTGfqout1 -o $RTGoutdir1/nogroup -f fastq -t $RTGnumthreads --noextract --nogroup
 	else
 		return 100
 	fi
@@ -120,11 +121,11 @@ RunTrimGalore () {
 #		if [ ! -d $RTGoutdir2/group ]; then
 #			mkdir -p $RTGoutdir2/group
 #		fi
-#		fastqc $RTGfqout2 -o $RTGoutdir2/group -f fastq -t $numthreads --noextract
+#		fastqc $RTGfqout2 -o $RTGoutdir2/group -f fastq -t $RTGnumthreads --noextract
 		if [ ! -d $RTGoutdir2/nogroup ]; then
 			mkdir -p $RTGoutdir2/nogroup
 		fi
-		fastqc $RTGfqout2 -o $RTGoutdir2/nogroup -f fastq -t $numthreads --noextract --nogroup
+		fastqc $RTGfqout2 -o $RTGoutdir2/nogroup -f fastq -t $RTGnumthreads --noextract --nogroup
 	else
 		return 100
 	fi
@@ -142,13 +143,14 @@ RunTrimGalore () {
 RunTrimmomatic () {
 	local RMr1=$1
 	local RMr2=$2
-	local RMfile_adaptor=$3
-	local RMpath_trimmomatic=$4
+	local RMpath_trimmomatic=$3
+	local RMfile_adaptor=$4
 	local RMoutfq1_paired=$5
 	local RMoutfq2_paired=$6
 	local RMoutpfx=$7
 	local RMmin_qual=$8
 	local RMmin_len=$9
+	local RMnumthreads=${10}
 	
 	local RMsubinfo="FuhaoBash_FastqMod(RunTrimmomatic)"
 	local RMoutfq1_unpaired="$RMoutpfx.R1.unpaired.fq.gz"
@@ -158,7 +160,10 @@ RunTrimmomatic () {
 		RMmin_qual=15
 	fi
 	if [ -z "$RMmin_len" ]; then
-		RMmin_len=90
+		RMmin_len=70
+	fi
+	if [ -z "$RMnumthreads" ]; then
+		RMnumthreads=1
 	fi
 	local RMpathdir1=$(dirname $RMoutfq1_paired)
 	if [ ! -d $RMpathdir1 ]; then
@@ -190,7 +195,7 @@ RunTrimmomatic () {
 	echo "${RMsubinfo}Info: Min Length      : $RMmin_len"
 	
 	
-	java -jar $RMpath_trimmomatic PE -threads $numthreads -phred33 \
+	java -jar $RMpath_trimmomatic PE -threads $RMnumthreads -phred33 \
 	-trimlog $RMoutlog \
 	$RMr1 \
 	$RMr2 \
@@ -202,21 +207,21 @@ RunTrimmomatic () {
 		if [ ! -d $RMpathdir1/group ]; then
 			mkdir -p $RMpathdir1/group
 		fi
-		fastqc $RMoutfq1_paired -o $RMpathdir1/group -f fastq -t $numthreads --noextract
+		fastqc $RMoutfq1_paired -o $RMpathdir1/group -f fastq -t $RMnumthreads --noextract
 #		if [ ! -d $RMpathdir1/nogroup ]; then
 #			mkdir -p $RMpathdir1/nogroup
 #		fi
-#		fastqc $RMoutfq1_paired -o $RMpathdir1/nogroup -f fastq -t $numthreads --noextract --nogroup
+#		fastqc $RMoutfq1_paired -o $RMpathdir1/nogroup -f fastq -t $RMnumthreads --noextract --nogroup
 	fi
 	if [ -s $RMoutfq2_paired ]; then
 		if [ ! -d $RMpathdir2/group ]; then
 			mkdir -p $RMpathdir2/group
 		fi
-		fastqc $RMoutfq2_paired -o $RMpathdir2/group -f fastq -t $numthreads --noextract
+		fastqc $RMoutfq2_paired -o $RMpathdir2/group -f fastq -t $RMnumthreads --noextract
 #		if [ ! -d $RMpathdir2/nogroup ]; then
 #			mkdir -p $RMpathdir2/nogroup
 #		fi
-#		fastqc $RMoutfq2_paired -o $RMpathdir2/nogroup -f fastq -t $numthreads --noextract --nogroup
+#		fastqc $RMoutfq2_paired -o $RMpathdir2/nogroup -f fastq -t $RMnumthreads --noextract --nogroup
 	fi
 
 	return 0

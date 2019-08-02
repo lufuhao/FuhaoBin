@@ -4,11 +4,11 @@ use strict;
 ###Version: 20181018
 print '#!/bin/bash
 ### Exit if command fails
-set -o errexit
+#set -o errexit
 ### Set readonly variable
 #readonly passwd_file=”/etc/passwd”
 ### exit when variable undefined
-set -o nounset
+#set -o nounset
 ### Script Root
 RootDir=$(cd `dirname $(readlink -f $0)`; pwd)
 ### MachType
@@ -74,8 +74,7 @@ Author:
 HELP
 exit 0
 }
-[ -z "$@" ] && help
-[ -z "$1" ] && help
+[ $# -lt 1 ] && help
 [ "$1" = "-h" ] || [ "$1" = "--help" ] && help
 #################### Environments ###################################
 echo -e "\n######################\nProgram $ProgramName initializing ...\n######################\n"
@@ -90,7 +89,7 @@ opt_t=1
 while [ -n "$1" ]; do
   case "$1" in
     -h) help;shift 1;;
-    -i) opt_i=$2;shift 2;;
+    -i) FastQR1Arr=($(echo $2 | tr ',' "\n"));shift 2;;
     -t) opt_t=$2;shift 2;;
     -1) seq_rfn=(${seq_rfn[@]} "$2");shift 2;;
     -s) opt_s=1;shift 1;;
