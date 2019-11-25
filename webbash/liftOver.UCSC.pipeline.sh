@@ -1,5 +1,7 @@
 #!/bin/bash
- 
+
+# Suppose we have two different assemblies of the same organism, G1.fasta and G2.fasta, and we want to know the which regions in G2 correspond to our interested regions in G1, what should we do? UCSC LiftOver is a great tool to solve this kind of problems
+
 # split G2 into individual chromosome/scaffold (G2.$i.fa) and save them into ./G2_chr direcotry
 # I did this step by using a perl script which I wrote, but you can also use UCSC faSplit tool I think.
 # Say there are n chromosomes/scaffolds in the G2 assembly, so we will have G2.1.fa, G2.2.fa, ..., G2.n.fa.
