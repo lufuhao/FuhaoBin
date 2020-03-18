@@ -72,7 +72,7 @@ Author:
   Norwich NR4 7UH, United Kingdom
   E-mail: Fu-Hao.Lu@jic.ac.uk
 HELP
-exit 0
+exit 2
 }
 [ $# -lt 1 ] && help
 [ "$1" = "-h" ] || [ "$1" = "--help" ] && help
