@@ -186,7 +186,7 @@ time $gatk ApplyVQSR \
 	--tranches-file $outdir/gatk/${sample}.HC.snps.indels.tranches \
 	-recalFile $outdir/gatk/${sample}.HC.snps.indels.recal \
 	-mode INDEL \ 
-	-O $outdir/gatk/${sample}.HC.VQSR.vcf.gz && echo "**SNPs and Indels VQSR (${sampte}.HC.VQSR.vcf.gz finish) done **"
+	-O $outdir/gatk/${sample}.HC.VQSR.vcf.gz && echo "**SNPs and Indels VQSR (${sample}.HC.VQSR.vcf.gz finish) done **"
 
 #可以被删除清理的文件，这不是必须执行的
 #1）对于比对文件只有最终的${sample}.sorted.markdup.BQSR.bam值得留下来
