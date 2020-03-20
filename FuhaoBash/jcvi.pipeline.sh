@@ -46,13 +46,29 @@ $0 --- Brief Introduction
 Version: 20200316
 
 Requirements:
-	LAST (http://last.cbrc.jp/)
-	get_the_longest_transcripts.py (https://github.com/xuzhougeng/myscripts)
-	seqkit (https://github.com/shenwei356/seqkit)
-#	perl && File::Spec
+    LAST (http://last.cbrc.jp/)
+    get_the_longest_transcripts.py (https://github.com/xuzhougeng/myscripts)
+      python3
+    seqkit (https://github.com/shenwei356/seqkit)
+    jcvi (https://github.com/tanghaibao/jcvi)
+      Biopython (http://www.biopython.org/)
+      numpy (http://numpy.scipy.org/)
+      matplotlib (http://matplotlib.org/)
 
 Descriptions:
-	
+  This script calculate gene synteny and draw the synteny plot
+    Source file needed
+      1. Protein/CDS/cDNA multifasta file for both query and subject
+      2. GFF3 file
+    Steps
+      1. Convert GFF3 to BED format
+        4column: chr[tab]start[tab]end[tab]ID
+          ID should be the same ith multifasta seqID
+      2. run JCVI to get the raw synteny/anchors
+        JCVI use LAST for similarity search
+      3. Synteny screen to get high quality anchors
+      4. Make synteny plot
+      5. Filter 1:1 match for furthr analyais
 
 Options:
   -h    Print this help message
@@ -63,24 +79,30 @@ Options:
   -p1   Query Prefix
   -p2   Subject Prefix
   -d    Output directory, default: .
-  -fmt   Molecular type: cds/pep, default:pep
+  -mt   Molecular type: cds/pep, default:pep
   -type GFF feature to be extracted, default: mRNA
   -key  GFF feature to seqID: ID/Name, default: ID
-  -cs   csscore for 'jcvi.compara.catalog ortholog'
-  
-  -t    Number of threads, default: 1
-  -s    Not run simulation
-  -a    Not run assembly
+  -cs   csscore for jcvi.compara.catalog ortholog, default: 0.7
+  -mp   minspan for jcvi.compara.synteny screen, default: 0
+  -mz   minsize for jcvi.compara.synteny screen, default: 0
+  -clean Clean Temporary files:
+            * lastdb files
+
+
 
 Example:
-  $0 -i ./chr1.fa -t 10
+  $0 \\
+      -i1 ./sp1.fa.gz -i2 ./sp2.fa.gz -g1 ./sp1.gff.gz -g2 ./sp2.gff.gz \\
+      -p1 sp1 -p2 sp2 -fmt pep -type mRNA -key ID -mp 30 -mz 10
 
 Author:
   Fu-Hao Lu
-  Post-Doctoral Scientist in Micheal Bevan laboratory
-  Cell and Developmental Department, John Innes Centre
-  Norwich NR4 7UH, United Kingdom
-  E-mail: Fu-Hao.Lu@jic.ac.uk
+  Professor, PhD
+  State Key Labortory of Crop Stress Adaptation and Improvement
+  College of Life Science
+  Jinming Campus, Henan University
+  Kaifeng 475004, P.R.China
+  E-mail: lufuhao@henu.edu.cn
 HELP
 exit 0
 }
@@ -96,12 +118,13 @@ opt_d=$PWD;
 opt_type="mRNA";
 opt_key="ID";
 opt_fmt="pep"
-opt_cscore=0.7
+opt_cc=0.7
+opt_mp=0
+opt_mz=0
+opt_clean=0
+opt_useLongest=0;
 
 
-opt_s=0
-opt_a=0
-opt_t=1
 #################### Parameters #####################################
 while [ -n "$1" ]; do
   case "$1" in
@@ -112,19 +135,22 @@ while [ -n "$1" ]; do
     -g2) opt_g2=$2;shift 2;;
     -p1) opt_p1=$2;shift 2;;
     -p2) opt_p2=$2;shift 2;;
+    -ul) opt_useLongest=1;shift;;
     -d) opt_d=$2;shift 2;;
     -type) opt_type=$2;shift 2;;
     -key)  opt_key=$2;shift 2;;
     -mt)   opt_mt=$2;shift 2;;
-    -cc)   opt_cscore=$2;shift 2;;
-    
+    -cc)   opt_cc=$2;shift 2;;
+    -mp)   opt_mp=$2;shift 2;;
+    -mz)   opt_mz=$2;shift 2;;
+    -clean) opt_clean=1; shift;;
     
     
 #FastQR1Arr=($(echo $2 | tr  "\n"));shift 2;;
-    -t) opt_t=$2;shift 2;;
-    -1) seq_rfn=(${seq_rfn[@]} "$2");shift 2;;
-    -s) opt_s=1;shift 1;;
-    -a) opt_a=1;shift 1;;
+#    -t) opt_t=$2;shift 2;;
+#    -1) seq_rfn=(${seq_rfn[@]} "$2");shift 2;;
+#    -s) opt_s=1;shift 1;;
+#    -a) opt_a=1;shift 1;;
     --) shift;break;;
     -*) echo "error: no such option $1. -h for help" > /dev/stderr;exit 1;;
     *) break;;
@@ -144,44 +170,43 @@ CmdExists () {
 
 
 
-
-
 #################### Command test ###################################
 CmdExists 'lastal'
 if [ $? -ne 0 ]; then
-	echo "Error: CMD 'lastal' in PROGRAM 'LAST' is required but not found.  Aborting..." >&2 
+	echo "Error: CMD 'lastal' in PROGRAM 'LAST' (http://last.cbrc.jp/) is required but not found.  Aborting..." >&2 
 	exit 127
 fi
 CmdExists 'lastdb'
 if [ $? -ne 0 ]; then
-	echo "Error: CMD 'lastdb' in PROGRAM 'LAST' is required but not found.  Aborting..." >&2 
+	echo "Error: CMD 'lastdb' in PROGRAM 'LAST' (http://last.cbrc.jp/) is required but not found.  Aborting..." >&2 
 	exit 127
 fi
-
-
-
-
+CmdExists 'get_the_longest_transcripts.py'
 if [ $? -ne 0 ]; then
-	echo "Error: CMD/script 'samtools' in PROGRAM 'SAMtools' is required but not found.  Aborting..." >&2 
+	echo "Error: script 'get_the_longest_transcripts.py' on https://github.com/xuzhougeng/myscripts is required but not found.  Aborting..." >&2 
 	exit 127
 fi
-if [[ $(CmdExists 'mum.stat') -eq 1 ]]; then
-	echo "Error: script 'mum.stat' is required but not found.  Aborting..." >&2 
+CmdExists 'seqkit'
+if [ $? -ne 0 ]; then
+	echo "Error: CMD 'seqkit' in PROGRAM 'seqkit' (https://github.com/shenwei356/seqkit) is required but not found.  Aborting..." >&2 
 	exit 127
 fi
+
 
 
 #################### Defaults #######################################
 step=0;
-path_data="$opt_d/0.data"
-path_ortholog="$opt_d/1.ortholog"
-path_synteny="$opt_d/2.synteny"
+path_data="$opt_d/1.data"
+path_ortholog="$opt_d/2.ortholog"
+path_synteny="$opt_d/3.synteny"
+path_plot="$opt_d/4.plot"
+path_1to1="$opt_d/5.1to1"
 
 mt_type=''
 if [[ $opt_fmt =~ ^[pP][eE][pP]$ ]];then
 	opt_fmt='pep'
 	mt_type='prot'
-elif [[ $opt_fmt =~ ^[cC][dD][sS]$ ]]
+elif [[ $opt_fmt =~ ^[cC][dD][sS]$ ]]; then
 	opt_fmt='cds'
 	mt_type='nucl'
 else
@@ -191,19 +216,31 @@ fi
 
 
 #################### Input and Output ###############################
-opt_i1
-opt_i2
-opt_g1
-opt_g2
-opt_p1
-opt_p2
-opt_d=$PWD;
-opt_type="mRNA";
-opt_key="ID";
 
 
 
 #################### Main ###########################################
+echo "################# Parameter check ####################"
+echo "    -i1    $opt_i1"
+echo "    -i2    $opt_i2"
+echo "    -g1    $opt_g1"
+echo "    -g2    $opt_g2"
+echo "    -p1    $opt_p1"
+echo "    -p2    $opt_p2"
+echo "    -ul    $opt_useLongest"
+echo "    -d     $opt_d"
+echo "    -type  $opt_type"
+echo "    -key   $opt_key"
+echo "    -mt    $opt_mt"
+echo "    -cc    $opt_cc"
+echo "    -mp    $opt_mp"
+echo "    -mz    $opt_mz"
+echo "    -clean $opt_clean"
+echo -e "\n\n\n"
+
+
+
+
 
 ### Step1: prepare data
 ((step++));
@@ -214,37 +251,25 @@ else
 fi
 cd $path_data
 
-# prepare fasta
-if [ ! -s $path_data/$opt_p1.$opt_fmt ]; then
-	if [[ $opt_i1 =~ ^.*\.[gG][zZ]$ ]]; then
-		echo "#Step${step} Info: Query in fasta.gz format, decompressing"
-		gunzip -c $opt_i1 > $path_data/$opt_p1.$opt_fmt
-	else
-		echo "#Step${step} Info: Query in fasta format, Linking"
-		ln -sf $opt_i1 $path_data/$opt_p1.$opt_fmt
-	fi
-else
-	echo "Warnings: Step${step}: use existing path $path_data; Delete this folder if you have new data" >&2
-fi
-if [ ! -s $path_data/$opt_p2.fa ]; then
-	if [[ $opt_i2 =~ ^.*\.[gG][zZ]$ ]]; then
-		echo "#Step${step} Info: Subject in fasta.gz format, decompressing"
-		gunzip -c $opt_i2 > $path_data/$opt_p2.$opt_fmt
-	else
-		echo "#Step${step} Info: Subject in fasta format, Linking"
-		ln -sf $opt_i2 $path_data/$opt_p2.$opt_fmt
-	fi
-else
-	
-fi
-
+#
+#zcat Athaliana_167_TAIR10.gene.gff3.gz | python ~/scripts/python/get_the_longest_transcripts.py  > ath_lst_gene.txt
+#sed -i 's/\.v2\.1//g' aly_lst_gene.txt
+#sed -i 's/\.TAIR10//g' ath_lst_gene.txt
+#
+#
 # prepare bed
 if [ ! -s $path_data/$opt_p1.bed ]; then
-	python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g1 > $path_data/$opt_p1.bed
-	if [ $? -ne 0 ] || [ ! -s $path_data/$opt_p1.bed ]; then
-		echo "Error: Step${step}: Failed to convert query GFF to BED" >&2
-		echo "CMD used: python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g1 > $path_data/$opt_p1.bed"
-		exit 100;
+	if [ $opt_useLongest -eq 0 ]; then
+		python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g1 > $path_data/$opt_p1.bed
+		if [ $? -ne 0 ] || [ ! -s $path_data/$opt_p1.bed ]; then
+			echo "Error: Step${step}: Failed to convert query GFF to BED" >&2
+			echo "CMD used: python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g1 > $path_data/$opt_p1.bed"
+			exit 100;
+		fi
+	else
+		zcat  $opt_g1 | get_the_longest_transcripts.py | cut -f 2 > $path_data/$opt_p1.longest.genes
+		python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g1 > $path_data/$opt_p1.all.bed
+		grep -f $path_data/$opt_p1.longest.genes $path_data/$opt_p1.all.bed > $path_data/$opt_p1.bed
 	fi
 else
 	echo "Warnings: Step${step}: using existing Query BED: $path_data/$opt_p1.bed" >&2
@@ -254,26 +279,65 @@ head -n 5 $path_data/$opt_p1.bed
 echo -e "\n\n\n"
 
 if [ ! -s $path_data/$opt_p2.bed ]; then
-	python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g2 > $path_data/$opt_p2.bed
-	if [ $? -ne 0 ] || [ ! -s $path_data/$opt_p2.bed ]; then
-		echo "Error: Step${step}: Failed to convert subject GFF to BED" >&2
-		echo "CMD used: python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g2 > $path_data/$opt_p2.bed"
-		exit 100;
+	if [ $opt_useLongest -eq 0 ]; then
+		python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g2 > $path_data/$opt_p2.bed
+		if [ $? -ne 0 ] || [ ! -s $path_data/$opt_p2.bed ]; then
+			echo "Error: Step${step}: Failed to convert subject GFF to BED" >&2
+			echo "CMD used: python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g2 > $path_data/$opt_p2.bed"
+			exit 100;
+		fi
+	else
+		zcat  $opt_g2 | get_the_longest_transcripts.py > $path_data/$opt_p2.longest.genes
+		python2 -m jcvi.formats.gff bed --type=$opt_type --key=$opt_key $opt_g2 > $path_data/$opt_p2.all.bed
+		grep -f $path_data/$opt_p2.longest.genes $path_data/$opt_p2.all.bed > $path_data/$opt_p2.bed
 	fi
 else
 	echo "Warnings: Step${step}: using existing Subject BED: $path_data/$opt_p2.bed" >&2
 fi
 echo "#Step${step} Info: top 5 lines pf subject BED"
 head -n 5 $path_data/$opt_p2.bed
+
+
+# prepare fasta
+if [ ! -s $path_data/$opt_p1.$opt_fmt ]; then
+	if [ $opt_useLongest -eq 0 ]; then
+		if [[ $opt_i1 =~ ^.*\.[gG][zZ]$ ]]; then
+			echo "#Step${step} Info: Query in fasta.gz format, decompressing"
+			gunzip -c $opt_i1 > $path_data/$opt_p1.$opt_fmt
+		else
+			echo "#Step${step} Info: Query in fasta format, Linking"
+			ln -sf $opt_i1 $path_data/$opt_p1.$opt_fmt
+		fi
+	else
+		if [ ! -s $path_data/$opt_p1.longest.genes ]; then
+			zcat  $opt_g1 | get_the_longest_transcripts.py | cut -f 2 > $path_data/$opt_p1.longest.genes
+		fi
+		seqkit grep -f $path_data/$opt_p1.longest.genes $opt_i1 > $path_data/$opt_p1.$opt_fmt
+	fi
+else
+	echo "Warnings: Step${step}: use existing file: $path_data/$opt_p1.$opt_fmt; Delete this if you have new data" >&2
+fi
+if [ ! -s $path_data/$opt_p2.$opt_fmt ]; then
+	if [ $opt_useLongest -eq 0 ]; then
+		if [[ $opt_i2 =~ ^.*\.[gG][zZ]$ ]]; then
+			echo "#Step${step} Info: Subject in fasta.gz format, decompressing"
+			gunzip -c $opt_i2 > $path_data/$opt_p2.$opt_fmt
+		else
+			echo "#Step${step} Info: Subject in fasta format, Linking"
+			ln -sf $opt_i2 $path_data/$opt_p2.$opt_fmt
+		fi
+	else
+		if [ ! -s $path_data/$opt_p2.longest.genes ]; then
+			zcat  $opt_g2 | get_the_longest_transcripts.py | cut -f 2 > $path_data/$opt_p2.longest.genes
+		fi
+		seqkit grep -f $path_data/$opt_p2.longest.genes $opt_i2 > $path_data/$opt_p2.$opt_fmt
+	fi
+else
+	echo "Warnings: Step${step}: use existing file: $path_data/$opt_p2.$opt_fmt; Delete this if you have new data" >&2
+fi
 echo -e "\n\n\n"
 
 
-#zcat Alyrata_384_v2.1.gene.gff3.gz | python ~/scripts/python/get_the_longest_transcripts.py > aly_lst_gene.txt
-#zcat Athaliana_167_TAIR10.gene.gff3.gz | python ~/scripts/python/get_the_longest_transcripts.py  > ath_lst_gene.txt
-#sed -i 's/\.v2\.1//g' aly_lst_gene.txt
-#sed -i 's/\.TAIR10//g' ath_lst_gene.txt
-#seqkit grep -f  <(cut -f 2 ath_lst_gene.txt ) Athaliana_167_TAIR10.cds.fa.gz > ath.cds
-#seqkit grep -f  <(cut -f 2 aly_lst_gene.txt ) Alyrata_384_v2.1.cds.fa.gz > aly.cds
 
 
 
@@ -287,19 +351,22 @@ else
 fi
 cd $path_ortholog
 
+if [ ! -s $path_ortholog/$opt_p1.$opt_p2.anchors ]; then
+	ln -sf $path_data/$opt_p1.bed $path_ortholog/$opt_p1.bed
+	ln -sf $path_data/$opt_p2.bed $path_ortholog/$opt_p2.bed
+	ln -sf $path_data/$opt_p1.$opt_fmt $path_ortholog/$opt_p1.$opt_fmt
+	ln -sf $path_data/$opt_p2.$opt_fmt $path_ortholog/$opt_p2.$opt_fmt
 
-ln -sf $path_data/$opt_p1.bed $path_ortholog/$opt_p1.bed
-ln -sf $path_data/$opt_p2.bed $path_ortholog/$opt_p2.bed
-ln -sf $path_data/$opt_p1.$opt_fmt $path_ortholog/$opt_p1.$opt_fmt
-ln -sf $path_data/$opt_p2.$opt_fmt $path_ortholog/$opt_p2.$opt_fmt
-
-python -m jcvi.compara.catalog ortholog $opt_p1 $opt_p2 --no_strip_names --dbtype $mt_type --cscore=$opt_cscore
-if [ $? -ne 0 ] || [ ! -s $path_ortholog/$opt_p1.$opt_p2.anchors ]; then
-	echo "Error: Step${step}: jcvi.compara.catalog ortholog running error" >&2
-	echo "CMD used: python -m jcvi.compara.catalog ortholog $opt_p1 $opt_p2 --no_strip_names --dbtype $mt_type --cscore=$opt_cscore" >&2
-	exit 100
+	python -m jcvi.compara.catalog ortholog $opt_p1 $opt_p2 --no_strip_names --dbtype $mt_type --cscore=$opt_cc
+	if [ $? -ne 0 ] || [ ! -s $path_ortholog/$opt_p1.$opt_p2.anchors ]; then
+		echo "Error: Step${step}: jcvi.compara.catalog ortholog running error" >&2
+		echo "CMD used: python -m jcvi.compara.catalog ortholog $opt_p1 $opt_p2 --no_strip_names --dbtype $mt_type --cscore=$opt_cc" >&2
+		exit 100
+	fi
 fi
-rm *.bck *.des *.prj *.sds *.ssp *.suf *.tis
+if [ $opt_clean -eq 1 ]; then
+	rm *.bck *.des *.prj *.sds *.ssp *.suf *.tis
+fi
 
 
 #Pairwise synteny visualization using dot plot.
@@ -321,34 +388,93 @@ fi
 cd $path_synteny
 
 ln -sf $path_ortholog/$opt_p1.$opt_p2.anchors $path_synteny/$opt_p1.$opt_p2.anchors
-python -m jcvi.compara.synteny screen --minspan=30 --simple --minsize=10 $opt_p1.$opt_p2.anchors $opt_p1.$opt_p2.anchors.new
-
+if [ ! -s $opt_p1.$opt_p2.anchors.new ]; then
+	python -m jcvi.compara.synteny screen --minspan=$opt_mp --simple --minsize=$opt_mz $opt_p1.$opt_p2.anchors $opt_p1.$opt_p2.anchors.new
+	if [ $? -ne 0 ] || [ ! -s $path_synteny/$opt_p1.$opt_p2.anchors.new ] || [ ! -s $path_synteny/$opt_p1.$opt_p2.anchors.simple ]; then
+		echo "Error: Step${step}: jcvi.compara.synteny screen running error" >&2
+		echo "CMD used: python -m jcvi.compara.synteny screen --minspan=$opt_mp --simple --minsize=$opt_mz $opt_p1.$opt_p2.anchors $opt_p1.$opt_p2.anchors.new" >&2
+		exit 100
+	fi
+fi
 
 
 
 ### Step4. plot
+((step++));
+if [ ! -d $path_plot ]; then
+	mkdir -p $path_plot
+else
+	echo "Warnings: Step${step}: existing path $path_plot; Delete this folder if you have new data" >&2
+fi
+cd $path_plot
+
+
+
+ln -sf $path_data/$opt_p1.bed $path_plot/$opt_p1.bed
+ln -sf $path_data/$opt_p2.bed $path_plot/$opt_p2.bed
+ln -sf $path_synteny/$opt_p1.$opt_p2.anchors.simple $path_plot/
 
 #seqids
-chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19
-Pp01,Pp02,Pp03,Pp04,Pp05,Pp06,Pp07,Pp08
+if [ ! -s $path_plot/$opt_p1.$opt_p2.seqids ]; then
+	cut -f 1 $opt_p1.bed | sort -u | tr "\n" "," > $path_plot/$opt_p1.$opt_p2.seqids
+	if [ $? -ne 0 ] || [ ! -s $opt_p1.$opt_p2.anchors.new ]; then
+		echo "Error: Step${step}: Failed to collect seqIDs for $opt_p1" >&2
+		exit 100
+	fi
+	cut -f 1 $opt_p2.bed | sort -u | tr "\n" "," >> $path_plot/$opt_p1.$opt_p2.seqids
+	if [ $? -ne 0 ] || [ ! -s $opt_p1.$opt_p2.anchors.new ]; then
+		echo "Error: Step${step}: Failed to collect seqIDs for $opt_p2" >&2
+		exit 100
+	fi
+fi
 
 
-#layout file, which tells the plotter where to draw what. The whole canvas is 0-1 on x-axis and 0-1 on y-axis. First, three columns specify the position of the track. Then rotation, color, label, vertical alignment (va), and then the genome BED file. Track 0 is now grape, track 1 is now peach. The next stanza specifies what edges to draw between the tracks. e, 0, 1 asks to draw edges between track 0 and 1, using information from the .simple file.
-# y, xstart, xend, rotation, color, label, va,  bed
- .6,     .1,    .8,       0,      , Grape, top, grape.bed
- .4,     .1,    .8,       0,      , Peach, top, peach.bed
-# edges
-e, 0, 1, grape.peach.anchors.simple
+#layout
+#The whole canvas is 0-1 on x-axis and 0-1 on y-axis. First, three columns specify the position of the track. Then rotation, color, label, vertical alignment (va), and then the genome BED file. Track 0 is now grape, track 1 is now peach. The next stanza specifies what edges to draw between the tracks. e, 0, 1 asks to draw edges between track 0 and 1, using information from the .simple file.
+if [ ! -s $path_plot/$opt_p1.$opt_p2.layout ]; then
+	echo "# y, xstart, xend, rotation, color, label, va, bed, label_va" > $path_plot/$opt_p1.$opt_p2.layout
+	echo ".6,     .1,    .8,       0,      m, $opt_p1, top, $opt_p1.bed, center" >> $path_plot/$opt_p1.$opt_p2.layout
+	echo ".4,     .1,    .8,       0,      k, $opt_p2, bottom, $opt_p2.bed, center" >> $path_plot/$opt_p1.$opt_p2.layout
+	echo "# edges" >> $path_plot/$opt_p1.$opt_p2.layout
+	echo "e, 0, 1, $opt_p1.$opt_p2.anchors.simple" >> $path_plot/$opt_p1.$opt_p2.layout
+fi
 
 
-python -m jcvi.graphics.karyotype --dpi=600 --format=png --font Arial seqids layout
+#utils/webcolors.py
+#perl -i -lane '$i="";$j=""; $line=$_; $F[0]=~s/^.*\*//; if ($F[0]=~/$TraesCS(\d+)[ABD]\d+G\d+$/) {$i=$1;}else{print STDERR "Error: no match1";} if ($F[2]=~/$TraesCS(\d+)[ABD]\d+G\d+$/) {$j=$1;}else{print STDERR "Error: no match2";} print STDERR "Info: i: $i; j : $j"; if ($i eq $j) {$line="red*".$line;}else{$line="black*".$line;} print $line;' aa.bb.anchors.simple
+
+if [ ! -s $path_plot/$opt_p1.$opt_p2.pdf ]; then
+	python -m jcvi.graphics.karyotype --dpi=600 --format=pdf --font=Arial $path_plot/$opt_p1.$opt_p2.seqids $path_plot/$opt_p1.$opt_p2.layout
+	if [ $? -ne 0 ] || [ ! -s karyotype.pdf ]; then
+		echo "Error: Step${step}: Failed to run jcvi.graphics.karyotype for seqids: $path_plot/$opt_p1.$opt_p2.seqids layout:$path_plot/$opt_p1.$opt_p2.layout" >&2
+		exit 100
+	fi
+	mv karyotype.pdf $path_plot/$opt_p1.$opt_p2.pdf
+fi
 
 
 
 ### Step5. 1:1
+((step++));
+if [ ! -d $path_1to1 ]; then
+	mkdir -p $path_1to1
+else
+	echo "Warnings: Step${step}: existing path $path_1to1; Delete this folder if you have new data" >&2
+fi
+cd $path_1to1
 
 
+#ln -sf $path_synteny/$opt_p1.$opt_p2.anchors.new $path_1to1/
+SimpleFile=$path_synteny/$opt_p1.$opt_p2.anchors.new
 
+grep -v ^'#' $SimpleFile | cut -f 1 | sort | uniq -d > $opt_p1.$opt_p2.duplicated.list
+grep -v ^'#' $SimpleFile | cut -f 2 | sort | uniq -d >> $opt_p1.$opt_p2.duplicated.list
+grep -v -f $opt_p1.$opt_p2.duplicated.list $SimpleFile > $path_1to1/$opt_p1.$opt_p2.anchors.new.uniq
+grep -v ^'#' $SimpleFile | wc -l
+cat $opt_p1.$opt_p2.duplicated.list | wc -l
+grep -v ^'#' $path_1to1/$opt_p1.$opt_p2.anchors.new.uniq | wc -l
+
+#list.merger.pl Final.AABBDD.uniq "undef" final.uniq dd.aa.anchors.new.uniq dd.bb.anchors.new.uniq
 
 
 if [ $? -ne 0 ] || [ ! -s $gffout ]; then

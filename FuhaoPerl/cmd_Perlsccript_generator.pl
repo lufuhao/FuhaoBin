@@ -12,7 +12,7 @@ use constant USAGE=><<EOH;
 SYNOPSIS:
 
 perl $0 --input my.fa [Options]
-Version: LUFUHAO20171113
+Version: v20200320
 
 Requirements:
     Programs:
@@ -37,11 +37,12 @@ Example:
 
 Author:
     Fu-Hao Lu
-    Post-Doctoral Scientist in Micheal Bevan laboratory
-    Cell and Developmental Department, John Innes Centre
-    Norwich NR4 7UH, United Kingdom
-    E-mail: Fu-Hao.Lu\@jic.ac.uk
-
+    Professor, PhD
+    State Key Labortory of Crop Stress Adaptation and Improvement
+    College of Life Science
+    Jinming Campus, Henan University
+    Kaifeng 475004, P.R.China
+    E-mail: lufuhao@henu.edu.cn
 EOH
 ###HELP ends#########################################################
 die USAGE unless @ARGV;
@@ -89,3 +90,9 @@ $verbose=0 unless (defined $verbose);
 ###Note:
 
 ';
+
+#    Fu-Hao Lu
+#    Post-Doctoral Scientist in Micheal Bevan laboratory
+#    Cell and Developmental Department, John Innes Centre
+#    Norwich NR4 7UH, United Kingdom
+#    E-mail: Fu-Hao.Lu\@jic.ac.uk

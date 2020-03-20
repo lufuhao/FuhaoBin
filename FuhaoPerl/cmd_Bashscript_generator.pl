@@ -47,7 +47,7 @@ cat<<HELP
 
 $0 --- Brief Introduction
 
-Version: 20181018
+Version: v20200320
 
 Requirements:
 	perl && File::Spec
@@ -67,10 +67,12 @@ Example:
 
 Author:
   Fu-Hao Lu
-  Post-Doctoral Scientist in Micheal Bevan laboratory
-  Cell and Developmental Department, John Innes Centre
-  Norwich NR4 7UH, United Kingdom
-  E-mail: Fu-Hao.Lu@jic.ac.uk
+  Professor, PhD
+  State Key Labortory of Crop Stress Adaptation and Improvement
+  College of Life Science
+  Jinming Campus, Henan University
+  Kaifeng 475004, P.R.China
+  E-mail: lufuhao@henu.edu.cn
 HELP
 exit 2
 }
@@ -144,3 +146,9 @@ if [ $? -ne 0 ] || [ ! -s $gffout ]; then
 	exit 100
 fi
 ';
+
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
