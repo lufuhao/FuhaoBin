@@ -137,7 +137,7 @@ fi
 
 if [ ! -s "$opt_o.bamtobed" ]; then
 	echo "Step(1/2)Info: comvert BAM to bed using bedtools bamtobed"
-	bedtools bamtobed -i $opt_i -bedpe > $opt_o.bamtobed
+	bedtools bamtobed -i $opt_i -bedpe > $opt_o.bamtobed 2> $opt_o.bamtobed.err
 	if [ $? -ne 0 ] || [ ! -s "$opt_o.bamtobed" ]; then
 		echo "Step(1/2)Error: $ProgramName error" >&2
 		echo "CMD used: bedtools bamtobed -i $opt_i -bedpe > $opt_o.bamtobed" >&2

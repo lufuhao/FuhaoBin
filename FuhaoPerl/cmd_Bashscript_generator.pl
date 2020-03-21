@@ -4,11 +4,11 @@ use strict;
 ###Version: 20181018
 print '#!/bin/bash
 ### Exit if command fails
-set -o errexit
+#set -o errexit
 ### Set readonly variable
 #readonly passwd_file=”/etc/passwd”
 ### exit when variable undefined
-set -o nounset
+#set -o nounset
 ### Script Root
 RootDir=$(cd `dirname $(readlink -f $0)`; pwd)
 ### MachType
@@ -47,7 +47,7 @@ cat<<HELP
 
 $0 --- Brief Introduction
 
-Version: 20181018
+Version: v20200320
 
 Requirements:
 	perl && File::Spec
@@ -67,15 +67,16 @@ Example:
 
 Author:
   Fu-Hao Lu
-  Post-Doctoral Scientist in Micheal Bevan laboratory
-  Cell and Developmental Department, John Innes Centre
-  Norwich NR4 7UH, United Kingdom
-  E-mail: Fu-Hao.Lu@jic.ac.uk
+  Professor, PhD
+  State Key Labortory of Crop Stress Adaptation and Improvement
+  College of Life Science
+  Jinming Campus, Henan University
+  Kaifeng 475004, P.R.China
+  E-mail: lufuhao@henu.edu.cn
 HELP
-exit 0
+exit 2
 }
-[ -z "$@" ] && help
-[ -z "$1" ] && help
+[ $# -lt 1 ] && help
 [ "$1" = "-h" ] || [ "$1" = "--help" ] && help
 #################### Environments ###################################
 echo -e "\n######################\nProgram $ProgramName initializing ...\n######################\n"
@@ -90,7 +91,7 @@ opt_t=1
 while [ -n "$1" ]; do
   case "$1" in
     -h) help;shift 1;;
-    -i) opt_i=$2;shift 2;;
+    -i) FastQR1Arr=($(echo $2 | tr ',' "\n"));shift 2;;
     -t) opt_t=$2;shift 2;;
     -1) seq_rfn=(${seq_rfn[@]} "$2");shift 2;;
     -s) opt_s=1;shift 1;;
@@ -145,3 +146,9 @@ if [ $? -ne 0 ] || [ ! -s $gffout ]; then
 	exit 100
 fi
 ';
+
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
