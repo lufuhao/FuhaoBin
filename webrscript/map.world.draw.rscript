@@ -1,0 +1,83 @@
+#!/usr/bin/Rscript
+
+### Prepare data
+#获取地图的数据:地图的GIS数据可以在国家基础地理信息中心的网站（http://nfgis.nsdi.gov.cn）里面免费下载。
+#官方公开的数据包括：地图数据，及居住地、交通、河流等辅助数据。
+
+### Load R packages
+library(maps)
+library(mapdata)
+library(maptools)
+library(gplots)
+library(RColorBrewer)
+library(openxlsx)
+
+
+
+# modify ddf and add Taiwan to China
+# Taiwan always belong to China
+tw = ddf[ddf$Country == 'China',]
+tw[1,1] = "Taiwan"
+ddf = rbind(ddf,tw)
+rownames(ddf) = NULL
+
+# a simple frame of world map
+#读取坐标数据之后呢，这时候数据全部存储在wrld_simpl这个对象中，通过plot()函数可以直接绘图
+data(wrld_simpl)
+plot(wrld_simpl)
+
+#把南极洲去除
+# this lets us use the contry name vs 3-letter ISO
+wrld_simpl@data$id <- wrld_simpl@data$NAME
+wrld <- fortify(wrld_simpl, region="id")
+wrld <- subset(wrld, id != "Antarctica") # we don't rly need Antarctica
+
+#通过ggplot()去做图，放弃base作图系统，这样方便我们做后续的图像调整
+## base map
+ggplot() + geom_map(data=wrld, map=wrld, aes(map_id=id, x=long, y=lat), fill="white", color="#7f7f7f", size=0.25)
+
+#把不同国家标注出来。罗列一个Excel表格，表格中有两列数据，第一列包含了240多个国家，按照字母顺序进行排列，第二列就是该国家对应的某个数据值。
+#Country	value
+#Aaland Islands	25
+#Afghanistan	40
+#Albania	46
+#...
+
+# read in data and arguments
+ddf = read.xlsx("contries.names.xlsx",sheet = 1) 
+# 划分数值间隔
+max.value = 100 # 最大值
+min.value = 0 # 最小值
+interval = 20 # 间隔
+# add our colored regions
+ggplot() + 
+  geom_map(data=wrld, map=wrld, aes(map_id=id, x=long, y=lat), fill="white", color="#7f7f7f", size=0.25) + 
+  geom_map(data=ddf, map=wrld, aes(map_id=Country, fill=brk),  color="white", size=0.25) 
+
+#数值直接作为一个连续性变量进行绘图,看上去颜色会更流畅一些
+# define your own color panel
+ggplot() + 
+  geom_map(data=wrld, map=wrld, aes(map_id=id, x=long, y=lat), fill="white", color="#7f7f7f", size=0.25) + 
+  geom_map(data=ddf, map=wrld, aes(map_id=Country, fill=Value),  color="white", size=0.25) +
+  scale_fill_gradientn(colours=colorpanel(75,
+                                          low="darkgreen",
+                                          mid="yellow",
+                                          high="red"))
+
+#把NEJM当中的配色或者Lancet当中的配色直接用到图中去。我们借用了ggsci包中的配色，用到我们的绘图中去，直接上代码：
+# NEJM
+ggplot() + 
+  geom_map(data=wrld, map=wrld, aes(map_id=id, x=long, y=lat), fill="white", color="#7f7f7f", size=0.25) + 
+  geom_map(data=ddf, map=wrld, aes(map_id=Country, fill=brk),  color="white", size=0.25) +
+  scale_fill_nejm(alpha = 0.6, name="Value")+
+  theme_void()
+
+# lancet
+ggplot() + 
+  geom_map(data=wrld, map=wrld, aes(map_id=id, x=long, y=lat), fill="white", color="#7f7f7f", size=0.25) + 
+  geom_map(data=ddf, map=wrld, aes(map_id=Country, fill=brk),  color="white", size=0.25) +
+  scale_fill_lancet(alpha = 0.6, name="Value")+
+  theme_void()
+
+
+

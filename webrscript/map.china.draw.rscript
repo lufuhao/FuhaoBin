@@ -1,0 +1,37 @@
+#!/usr/bin/Rscript
+
+### Prepare data
+#获取地图的数据:地图的GIS数据可以在国家基础地理信息中心的网站（http://nfgis.nsdi.gov.cn）里面免费下载。
+#官方公开的数据包括：地图数据，及居住地、交通、河流等辅助数据。
+
+### Load R packages
+library(maps)
+library(mapdata)
+library(maptools)
+
+library(gplots)
+library(RColorBrewer)
+library(openxlsx)
+
+# load GIS data
+x = readShapePoly("China.shp")
+
+## Plots
+#draw the map of china，所有省市的颜色都是一样
+plot(x, main="中国地图")
+
+# draw the map of China with different colors of each province
+plot(x,col=sample(terrain.colors(34)),main="中国地图")
+
+#将我国的四个直辖市的名字挑出来，然后定义成四个不同的颜色，其余省市还是用白色表示
+provname=c("北京市", "天津市", "重庆市", "上海市")
+procol=brewer.pal(4, "Set1")
+plot(x,col=getColor(x,orivname,provcol,"White"), main="中国地图-直辖市")
+
+#按照人口数量绘制地图
+provcol = colorpanel(max(pop) - min(pop) + 1,
+                     low="blue",
+                     mid="white",
+                     high="red")[pop - min(pop) + 1]
+plot(x,col=getColor(x,provname,provcol,"white"),
+     xlab="", ylab="",main="中国地图-各省市人口")
