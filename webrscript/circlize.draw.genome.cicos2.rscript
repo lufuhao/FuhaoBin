@@ -1,0 +1,118 @@
+#!/usr/bin/Rscript
+
+#circlize绘制基因组圈图专门有几个函数：
+#    circos.genomicinitialize() 初始化布局
+#    circos.genomicTrack()  创建新轨道，添加图形；
+#    circos.genomicPoints() 低级函数，添加点；
+#    circos.genomicLines() 低级函数，添加线；
+#    circos.genomicRect() 低级函数，添加矩形；
+#    circos.genomicText() 低级函数，添加文字；
+#    circos.genomicLink() 添加链接；
+
+###输入数据：
+#基因组数据通常会保存为一个表格，前三列定义基因组位置信息，比如基因组分类（染色体），起始位置和终止位置；然后后面记录其他数据信息，而这种数据结构称为BED格式。
+#circlize提供一个简单函数generateRandomBed()来生成随机基因组数据，来源于人类基因组；
+#    nr 控制行数，一般产生的行数与设置的不一致，不过不影响我们自己测试；
+#    nc 控制除了前三列外的列数；
+#    fun 参数随机生成数据。
+
+
+
+###1. 加载circlize，生成随机基因组数据bed；查看一下数据结构。
+library(circlize)
+set.seed(999)
+bed = generateRandomBed(nr = 10000, nc = 4, fun = function(k) sample(letters,k,replace = T))
+head(bed)
+
+#第一列是染色体信息，后面是起始和终止位置，然后就是其他观察值values。
+#chr	start	end	value1	value2	value3	value4
+#chr1	1341960	2507147	-0.8208843	0.74221329	0.75023865	0.04454757
+#chr1	17589430	18004367	-0.1226432	0.06270483	0.92044380	0.06566379
+#chr1	19961084	22109186	0.2106054	0.79701261	0.04742827	0.13922894
+#chr1	26194199	26346050	1.1045379	0.31520084	1.18609295	-0.48536394
+#chr1	31007994	32581500	-0.7072107	-0.84413334	0.20980002	0.44533081
+#chr1	35446447	35661744	1.0766255	0.05162805	0.16709284	-0.18843644
+
+
+
+###2. 设置绘图参数circos.par。
+#其中，track.height轨道高度为0.1，start.degree起始位置在90度，gap.degree设置间隙的距离为2，而21和22号染色体之间的间隙为4度；canvas.xlim设置x轴宽度为-1到1.5。
+circos.par(track.height = 0.1,start.degree = 90,gap.degree = c(rep(2,20),4,2,2,2),canvas.xlim = c(-1,1.5))
+
+
+
+###3. 初始化基因组数据。
+#默认添加x轴和扇区名称（即染色体名称），这时候也占用了一个轨道（track），但是我们看上去好像还没画轨道。
+circos.genomicInitialize(bed)
+
+
+
+###4. 创建第1个轨道。
+#（其实本质上是第2个轨道）用circos.genomicPoints绘制观察值记录的数据点；默认绘制所有观察值，这里用numeric.column设置绘制value1的值。region读取起始位置（第2列和第3列）；value指代前三列后面的所有列，因此numeric.column的值是从第4列开始的，即1代表第4列。
+
+
+
+circos.genomicTrack(bed, panel.fun = function(region,value,...){
+    circos.genomicPoints(region,value,numeric.column = 1,pch = 16,col = 'red',cex = 0.5)
+})
+
+
+
+###5. 绘制第2轨道。
+#在第2个轨道绘制value2的折线；
+circos.genomicTrack(bed, panel.fun = function(region,value,...){
+    circos.genomicLines(region,value,numeric.column = 2,col = 'green')
+})
+#还可以把4个value都画在一个轨道中；只需要有col来定义区分颜色就可以；
+circos.genomicTrack(bed, panel.fun = function(region,value,...){
+    circos.genomicLines(region,value,col = 1:4)
+})
+
+
+
+
+###6. 创建第3轨道。
+#在轨道中画矩形，从而绘制热图；给热图定义色阶；
+col_fun = colorRamp2(c(-1, 0, 1), c("green", "black", "red"))
+#绘制热图；根据第4列数据value[[1]]，即value1的取值来绘制热图；
+circos.genomicTrack(bed, panel.fun = function(region,value,...){
+    circos.genomicRect(region,value,col = col_fun(value[[1]]),border = NA)
+})
+#可以看到，value1值大于等于1都是红色，小于等于-1都是绿色，0是黑色，其他值就是它们之间的渐变。
+
+
+
+###7. 绘制第4轨道。
+#在轨道中画降雨图(rainfall)；不理解，看解释好像说的是不同region之间的距离。当然，这里的距离计算有不同的方法，默认是“min”，其他还有“max”、“mean”、“left”和“right”。具体也还需要查查，有熟悉的小伙伴可以在后台告诉我，不胜感激哈！
+circos.genomicRainfall(bed,col = 'blue',pch = 16,cex = 0.5)
+
+
+
+###8. 绘制第5轨道。
+#绘制基因组密度图density；额，这个密度我也不是很理解。
+circos.genomicDensity(bed,border = 'red',col = 'green')
+
+
+
+###9. 绘制链接；
+#在不同region之间添加link，这个可以展示不同染色体之间的关联，以及关联的强弱等信息；
+bed1 = bed[sample(nrow(bed), 100), ]
+bed2 = bed[sample(nrow(bed), 100), ]
+circos.genomicLink(bed1, bed2, col = sample(1:5, 100, replace = TRUE), border = NA)
+
+
+
+###10. 添加图例
+#图例是理解绘图的重要元素。然而，图例的绘制比较麻烦，circlize中没有绘制图例的工具，所以作者借用了ComplexHeatmap包中的Legend函数。
+
+lgd1 = Legend(at = 'value1',type = "points", legend_gp = gpar(col = "red"), pch = 16,title = "Track1",title_position = 'topleft')
+lgd2 = Legend(at = 'value2',type = "lines",legend_gp = gpar(col = "green"),title = "Track2", title_position = "topleft")
+lgd3 = Legend(at = c(-1,0,1),col_fun = col_fun,title = "Track3",title_position = "topleft")
+lgd4 = Legend(at = 'Rainfall',type = "points", legend_gp = gpar(col = "blue"), pch = 16,title = "Track4",title_position = 'topleft')
+lgd5 = Legend(at = 'Density',type = "grid",legend_gp = gpar(fill="green"),border = "red",title = "Track5",title_position = "topleft")
+lgd6 = Legend(at = c("rank1","rank2","rank3","rank4","rank5"),type = "grid", legend_gp = gpar(fill=palette()[1:5]),title = "Links",title_position = "topleft")
+
+pd = packLegend(lgd1,lgd2,lgd3,lgd4,lgd5,lgd6)
+draw(pd,x = unit(0.9,"npc") - unit(2,"cm"), just = "left")
+
+

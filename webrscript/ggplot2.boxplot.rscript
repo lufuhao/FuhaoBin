@@ -1,0 +1,60 @@
+#!/usr/bin/Rscript
+
+library(ggplot2)
+?geom_boxplot
+
+
+#    outlier.后面接colour、color、fill、shape、size、stroke、alpha，都是用来定义离群点的属性，包括外框颜色，填充颜色，形状，大小，透明度等等；
+#    notch 是否在盒子上添加卡槽；
+#    notchwidth  卡槽的宽度；
+#    varwidth 盒子的宽度是否按照组内观察值个数的平方根的大小而变化；
+
+#使用mpg数据，查看一下数据结构；
+head(mpg)
+
+#A tibble: 6 x 11
+#manufacturer	model	displ	year	cyl	trans	drv	cty	hwy	fl	class
+#<chr>	<chr>	<dbl>	<int>	<int>	<chr>	<chr>	<int>	<int>	<chr>	<chr>
+#audi	a4	1.8	1999	4	auto(l5)	f	18	29	p	compact
+#audi
+#audi
+#audi
+#audi
+#audi
+
+#绘制画布；x轴是class，分类型变量；y轴是hwy，连续型变量；
+p <- ggplot(mpg, aes(class,hwy))
+#画个简单的盒子；
+p + geom_boxplot()
+
+#图中的点就是离群点，我们还可以把原始数据中的点加入进去；
+p + geom_boxplot() + geom_point(color = 'red')
+#这样就加入了数据点；然而，实际中数据比图中的点多，这里只是被相互覆盖了；我们可以把它们都显示出来。
+
+p + geom_boxplot() + geom_jitter(width = 0.2, alpha = 0.5, color = 'green')
+#这样就让数据点在多少范围内(width)随机震荡开(geom_jitter)，绿色点表示原始数据点，而黑色点是离群点。
+
+#现在给盒子添加卡槽；
+p + geom_boxplot(notch = T, notchwidth = 0.5)
+
+#第一个盒子太短，添加卡槽就会出现反折，不太好看；这种情况一般就不建议添加卡槽了。
+#接下来，根据数据集的大小显示盒子的宽度；
+p + geom_boxplot(varwidth = T)
+#这时候有的盒子就变瘦了，有的变胖了。
+
+#现在的盒子太朴素，加点颜色看看；
+p + geom_boxplot(fill = 'green',color = 'red')
+#很直观可以看到，fill是填充，color是边框色；
+
+#此外，一样可以利用美学函数aes来进行分类上色；
+p + geom_boxplot(aes(color = class))
+
+#如果是用fill；
+p + geom_boxplot(aes(fill = class))
+
+#如果换个分类变量上色；
+p + geom_boxplot(aes(fill = factor(year))) + scale_fill_manual(name = 'Year',values = c('red','blue'))
+#图中显示了不同年份在不同类别上的区别；
+
+#还可以让盒子横着放，这个时候简单更改x和y的取值是不行的，必须用到coord_flip函数。
+p + geom_boxplot(aes(fill = factor(year))) + scale_fill_manual(name = 'Year',values = c('red','blue')) + coord_flip()

@@ -1,0 +1,77 @@
+#!/usr/bin/Rscript
+
+#今天学习ggplot2的散点图。虽然前面学习时，已经画了很多散点图，但是作为使用最为频繁的统计图形，散点图一哥的位置是很难动摇的。理所应当，必须作为第一个几何对象，好好学习。
+
+#首先，加载ggplot2包，然后查看一下geom_point的帮助文档。
+library(ggplot2)
+?geom_point
+
+#这个函数的参数并不多，主要是以下几个：
+#    mapping 映射，就是需要传入的美学元素x和y，缺省NULL表示继承上一个函数中的美学元素；
+#    data 就是传入的数据，缺省表示继承上一个函数中的data；
+#    stat  统计变化；
+#    position 位置参数；
+#    ... 缺省参数，表示散点图的基本参数，比如colour，fill，shape，size等等；
+#    na.rm 是否去除缺失值；
+#    show.legend 是否显示图例，NA表示自动选择；
+#    inherit.aes 是否继承美学元素。
+
+
+#我们使用默认数据集mtcars，来绘制散点图。
+
+#首先，准备画布；
+p <- ggplot(mtcars,aes(wt,mpg))
+
+#然后开始画散点；
+p + geom_point()
+
+#根据分类变量cyl设置颜色；
+p + geom_point(aes(color = cyl))
+
+#用标度函数scale_colour_gradient调节颜色，比如我们让颜色从绿色慢慢变深。
+p + geom_point(aes(color = cyl)) +scale_color_gradient(low = 'green')
+
+#我们还可以让点从绿色变成红色。
+p + geom_point(aes(color = cyl)) +scale_color_gradient(low = 'green', high = 'red')
+#很有意思吧，其实所谓的标度函数scale_就是图形绘制的遥控器，控制颜色，大小，形状等等属性。不过，正是它是遥控器，所以功能特别多样，要学起来也要多玩玩才行。
+
+#这里使用的是scale_colour_gradient，因为这里的值认为是连续变量，所以颜色可以按梯度渐变。但是，cyl只有4，6，8三个值，我们正常想让它显示为分类变量，这时要将其因子化。而这时候就不能用gradient来控制颜色了。
+p + geom_point(aes(color = factor(cyl)))
+
+#如果我们需要定义改变这种离散颜色，可以用另一个标度函数scale_colour_manual来自定义。
+p + geom_point(aes(color = factor(cyl))) + scale_colour_manual(values = c('blue','red','green'))
+
+#我们还可以设置图例的名称，比如设置为shuboy's mtcars。
+p + geom_point(aes(color = factor(cyl))) + scale_colour_manual( name = "shuboy's mtcars", values = c('blue','red','green'))
+
+#颜色玩的差不多了，玩玩形状shape吧。比如根据gear来设置形状，颜色还用上面的。
+p + geom_point(aes(color = factor(cyl), shape = factor(gear))) + scale_colour_manual( name = "shuboy's mtcars", values = c('blue','red','green'))
+
+#将点设置为空心的，图例名称设置为my gear。
+p + geom_point(aes(color = factor(cyl), shape = factor(gear))) + scale_colour_manual( name = "shuboy's mtcars", values = c('blue','red','green')) + scale_shape(name = 'my gear', solid = F)
+
+#当然，与颜色一样，形状也可以自定义。
+p + geom_point(aes(color = factor(cyl), shape = factor(gear))) + scale_colour_manual( name = "shuboy's mtcars", values = c('blue','red','green')) + scale_shape_manual(name = 'my gear', values = c(22:24))
+
+#此外，我们还可以设置图例的标签；
+p + geom_point(aes(color = factor(cyl), shape = factor(gear))) + scale_colour_manual( name = "shuboy's mtcars", values = c('blue','red','green'),label = c('aodi','daben','baoma')) + scale_shape_manual(name = 'my gear', values = c(22:24), label = c('my','your','his'))
+#哈哈，看这图就开心，我都有奥迪，奔驰和宝马了！
+
+#最后，玩玩点的大小，换个图看看。
+p <- ggplot(mpg,aes(displ,hwy))
+p + geom_point(aes(size = hwy))
+
+#同样，我们可以设置图例名称和标签，还可以自定义size图例的大小。
+p + geom_point(aes(size = hwy)) + scale_size(name = 'my size',breaks = c(15,25,35), labels = c('s','m','x'))
+
+#对于size而言，如果我们的数值是0，这个图会是什么样呢？
+df <- data.frame(x = c(0:10),y = c(10:20))
+ggplot(df,aes(x,y)) + geom_point(aes(size = x))
+
+#可以看到，这里绘制的size，0也会有一点面积，因为绘制时使用的相对大小。
+#怎么让0只是一个小点呢？
+ggplot(df,aes(x,y)) + geom_point(aes(size = x)) + scale_size_area()
+#scale_size_area函数是指将数值视为面积，而0是没有面积的，所以这里只有一个小点。
+
+#最后，如果我们想把数值当作点的半径来画大小，需要用到scale_radius。
+ggplot(df,aes(x,y)) + geom_point(aes(size = x)) + scale_radius()
