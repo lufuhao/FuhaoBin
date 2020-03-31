@@ -1,0 +1,144 @@
+#!/usr/bin/Rscript
+
+#主成分分析（Principal Component Analysis，PCA）， 是一种降维方法，也是在文章发表中常见的用于显示样本与样本之间差异性的计算工具。比如我们在进行转录组数据分析的时候，每一个样本可以检测到3万个基因，如果有10个这样的样本，我们如何判断哪些样本之间的相似性能高。这时候，我们可以通过主成分分析，显示样本与样本之间的关系。
+
+
+### 1.R包加载、读入数据
+#首先我们加载需要用到的R包，ggpubr和ggthemes包用于作图gmodels包用于计算PCA。
+install.packages("ggpubr")
+install.packages("ggthemes")
+install.packages("gmodels")
+library("ggpubr")
+library("ggthemes")
+library("gmodels")
+
+#读入表达谱数据并显示文件前6行，每一列为一个样本，每一行为一个基因。我们使用表达谱样本一共有10个，其中M1到M5为Case，M6-M10为control。
+
+data <- read.table("expression.txt", header=T, row.names=1)
+dim(data)
+head(data)
+
+#	M1	M2	M3	M4	M5	M6	M7	M8	M9	M10
+#GBP4	6.59	5.22	3.69	3.93	4.52	9.30	8.98	7.65	9.66	7.41
+#BCAT1	5.76	4.89	5.44	3.48	3.85	8.66	8.79	7.76	8.09	8.26
+#CMPK2	9.56	4.54	3.99	5.61	3.90	9.79	7.13	7.37	7.93	6.15
+#STOX2	8.39	8.71	8.03	7.64	9.27	4.41	7.72	3.54	4.30	6.96
+#PADI2	8.41	8.26	8.45	9.20	8.59	4.59	5.36	4.13	4.91	4.08
+#SCARNA5	7.65	5.78	10.63	5.91	8.80	5.89	5.52	3.82	4.04	7.95
+
+
+
+### 2.PCA计算
+#使用gmodels包中的fast.prcomp函数计算PCA。该包计算运行所用时间比R内置prcomp函数要快很多。计算完成后查看PCA计算前6行，可以看出最终的结算结果为一个矩阵，一共有10列10行，每一行为一个样本，每一列为一个主成分（PC）。
+#计算PCA
+pca.info <- fast.prcomp(data)
+#显示PCA计算结果前6行
+head(pca.info$rotation)
+
+#	PC1	PC2	PC3	PC4	PC5	PC6	PC7	PC8	PC9	PC10
+#M1	0.21	0.46	0.32	0.22	-0.30	0.14	-0.04	-0.00	0.60	0.31
+#M2	
+#M3	
+#M4	
+#M5	
+#M6	
+
+#接下来，我们就用这样一个PCA计算结果，来看Case和Control这两组样本之间的差异。我们建立一个data.frame（数据框），将PC数据和表型数都存入进来。
+
+#M1-M5为case,M6-M10为control
+#新建一个data.frame，包含所有样本信息和PC信息
+pca.data <- data.frame(sample = rownames(pca.info$rotation),
+                       Type = c(rep("Case",5),rep("Control",5)),
+                       pca.info$rotation)
+
+### 3. 基础绘图
+#ggpubr提供了非常多的作图函数，可以方便大家绘制更美观的科研做图。这里我们使用ggscatter这个函数，x轴为第一个主成分（PC1），y轴为第二个主成分（PC2）。
+
+ggscatter(pca.data, x= "PC1", y = "PC2",
+          color = "Type")
+
+
+
+### 4. 初级美化
+
+#如我们想更直观的显示两组之间的差别，所以我们需要根据点的分布计算他们的置信区间。
+#绘制PCA散点图
+#增加分组圈图
+ggscatter(pca.data, x= "PC1", y = "PC2",
+          color = "Type",
+          ellipse =TRUE)
+
+#这样，两群样本之间的差别一下子就凸显出来了~ 当然，我们也可以不用圆形，直接用点的边界，来展示样本与样本之间的差异，这样两组之间的差别会更加明显。
+#绘制PCA散点图
+#增加分组圈图，修改圈图样式
+ggscatter(pca.data, x= "PC1", y = "PC2",
+          color = "Type",
+          ellipse =TRUE, ellipse.type = "convex")
+
+
+### 5.中级美化
+#当然，从视觉效果来说，使用椭圆形边界要更美观一些。另外，我们也可以修改图的样式和颜色，来对绘图结果进行提升。
+#绘制PCA散点图
+#增加分组圈图
+#修改点的大小和颜色以及图的样式
+ggscatter(pca.data, x= "PC1", y = "PC2",
+          color = "Type",
+          ellipse =TRUE,
+          size = 4, palette = c("#1d419b", "#CC0000"),
+          main = "PCA plot") + theme_base()
+
+
+
+###终级美化
+#当然，我们还不能仅仅满足于现有的成果，作图是一个细致的过程，我们需要精雕细琢，不能放过任何一个有可能被老板或者reviewer们Diss到的地方。比如我们有时候需要直接在图上显示样本名称，从图上反映出样本之间的分布。
+#绘制PCA散点图
+#增加分组圈图
+#修改点的大小和颜色以及图的样式
+#显示所有样本
+ggscatter(pca.data, x= "PC1", y = "PC2",
+          color = "Type",
+          ellipse =TRUE,
+          size = 4, palette = c("#1d419b", "#CC0000"),
+          label = "sample", repel = TRUE,
+          main = "PCA plot") + theme_base()
+
+
+
+###究级美化
+#我们通过研究表达谱发现，CD52这个基因在Case和Control这两组之间有显著差异，那么我们如何将这种差异显示在图表中呢？另外如果样本数目比较多，比如有100个样本，我们并不想把所有的样本名称都显示在图表中，只想显示重要的2-4个样本，有没有什么更好的操作方法呢？这里就到了我们究极作图美化的环节了~
+#增加CD52表达信息
+pca.data$CD52 <- as.numeric(data["CD52"],)
+#绘制PCA散点图
+#增加分组圈图
+#修改点的大小和颜色以及图的样式
+#显示选定样本
+#按照CD52基因表达量显示点大小
+ggscatter(pca.data, x= "PC1", y = "PC2",
+          color = "Type",
+          ellipse =TRUE,
+          palette = c("#1d419b", "#CC0000"),
+          label = "sample", repel = TRUE,
+          label.select = c("M1", "M4", "M7", "M10"),
+          size = "CD52",
+          main = "PCA plot") + theme_base()
+
+#我们按照样本点的从大到小来显示CD52基因表达从高到低，同时，我们只显示了M1，M4，M7，M10这4个样本的名称。
+#当然，我们也可以把分组边界线去掉，同时将点透明度降低，来凸显两组差异和CD52的关系。
+
+#绘制PCA散点图
+#增加分组圈图
+#修改点的大小和颜色以及图的样式
+#显示样本
+#按照CD52基因表达量显示点大小
+ggscatter(pca.data, x= "PC1", y = "PC2",
+          color = "Type",
+          ellipse =TRUE,
+          ellipse.alpha = 0.1, ellipse.border.remove = TRUE,
+          palette = c("#1d419b", "#CC0000"),
+          label = "sample", repel = TRUE,
+          label.select = c("M1", "M4", "M7", "M10"),
+          size = "CD52", alpha = 0.7,
+          main = "PCA plot") + theme_base() + 
+scale_size(range = c(0.5,8))
+#如此，一张热腾腾的PCA分析图就诞生了~同时，我们在这张图上反应了样本两组之间差异，重要样本名，以及基因表达和样本分组之间关系。
+

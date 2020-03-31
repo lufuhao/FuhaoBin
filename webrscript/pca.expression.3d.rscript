@@ -1,0 +1,159 @@
+#!/usr/bin/Rscript
+
+#主成分分析（Principal Component Analysis，PCA），是一种降维方法，也是在文章发表中常见的用于显示样本与样本之间差异性的计算工具。在上一次教程中，我们教大家如何绘制二维主成分分析图，不过有时候二维的平面没有办法展示出样本之间的差异，所以需要用更多维度，比如三维主成分分析图来展示。
+
+#我们以一篇发表在Blood (IF = 16.562)上的文章为例进一步解读PCA的图形绘制。在这个实例中，通过对芯片表达谱数据进行PCA分析，观察前三个PC(PC1, PC2, PC3)，可以看出细胞按照不同来源：peripheral blood (PB)，bone marrow (BM), 和lymph nodes (LN)分成三组。
+
+#本次教程为大家带来是，是如何根据表达谱数据，通过运用主成分分析的方法，显示样本与样本之间的差异性，并且在三维坐标上展示这些差异。
+
+
+
+### 1. 数据读取
+#首先我们加载需要用到的R包，scatterplot3d包用于作图gmodels包用于计算PCA。
+install.packages("scatterplot3d")
+install.packages("gmodels")
+
+library("scatterplot3d")
+library("gmodels")
+
+#读入表达谱数据并显示文件前6行，每一列为一个样本，每一行为一个基因。我们使用表达谱样本一共有10个，其中M1到M5为Case，M6-M10为control。
+
+data <- read.table("expression.txt", header=T, row.names=1)
+dim(data)
+head(data)
+
+#	M1	M2	M3	M4	M5	M6	M7	M8	M9	M10
+#GBP4	6.59	5.22	3.69	3.93	4.52	9.30	8.98	7.65	9.66	7.41
+#BCAT1	5.76	4.89	5.44	3.48	3.85	8.66	8.79	7.76	8.09	8.26
+#CMPK2	9.56	4.54	3.99	5.61	3.90	9.79	7.13	7.37	7.93	6.15
+#STOX2	8.39	8.71	8.03	7.64	9.27	4.41	7.72	3.54	4.30	6.96
+#PADI2	8.41	8.26	8.45	9.20	8.59	4.59	5.36	4.13	4.91	4.08
+#SCARNA5	7.65	5.78	10.63	5.91	8.80	5.89	5.52	3.82	4.04	7.95
+
+
+
+### 2. 主成分分析
+#使用gmodels包中的fast.prcomp函数计算PCA。该包计算运行所用时间比R内置prcomp函数要快很多。计算完成后查看PCA计算前6行，可以看出最终的结算结果为一个矩阵，一共有10列10行，每一行为一个样本，每一列为一个主成分（PC）。我们就用这样一个PCA计算结果，来看Case和Control这两组样本之间的差异。然后建立一个data.frame，将PC数据和表型数都存入进来。这一步与上一版教程是一样的~
+#计算PCA
+pca.info <- fast.prcomp(data)
+#显示PCA计算结果前6行
+head(pca.info$rotation)
+
+#	PC1	PC2	PC3	PC4	PC5	PC6	PC7	PC8	PC9	PC10
+#M1	0.21	0.46	0.32	0.22	-0.30	0.14	-0.04	-0.00	0.60	0.31
+#M2	
+#M3	
+#M4	
+#M5	
+#M6	
+
+#M1-M5为case,M6-M10为control
+#新建一个data.frame，包含所有样本信息和PC信息
+pca.data <- data.frame(sample = rownames(pca.info$rotation),
+                       Type = c(rep("Case",5),rep("Control",5)),
+                       pca.info$rotation)
+
+
+
+### 3. 基础绘图
+#首先，我们使用前三个PC，绘制基本三维图。
+#绘制三维散点图
+scatterplot3d(pca.data[, c("PC1", "PC2", "PC3")])
+#这样，一张三维图就制作完成了。当然，如果我们真的在ppt或者文章中绘制成这个样子，肯定会被老板骂的狗血淋头~ 所以，我们需要对图进行美化和调整。
+
+
+
+### 4. 初级调整
+#我们将case和control用不同的颜色进行展示。
+
+#绘制PCA散点图
+#根据分组增加点的颜色
+colors.lib <- c("#CC0000", "#1d419b")
+colors <- colors.lib[as.numeric(pca.data$Type)]
+scatterplot3d(pca.data[, c("PC1", "PC2", "PC3")],
+              pch = 16, color = colors)
+
+
+
+### 5.中级调整
+#从这张图中，我们可以基本上出case和control在三维空间中分成了两组。当然，图片中的点有些小，而且三维图的角度还不够，所以需要进行进一步调整。
+#绘制PCA散点图
+#旋转三维图，并更改点的大小
+scatterplot3d(pca.data[, c("PC1", "PC2", "PC3")],
+              pch = 16, color = colors，
+              angle = 60, cex.sumbols= 2,
+              main = "PCA plot")
+
+#同样，我们也可以为case和control增加不同的形状。
+#绘制PCA散点图
+#旋转三维图，并更改点的大小
+#增加坐标轴信息
+#改变点的形状
+shapes.lib = c(16,17)
+shapes <- shapes.lib[as.numeric(pca.data$Type)]
+
+scatterplot3d(pca.data[, c("PC1", "PC2", "PC3")],
+              pch = shapes, color = colors，
+              angle = 60, cex.sumbols= 2,
+              main = "PCA plot")
+
+
+
+### 6. 高级调整
+#不知道大家是否发现了一个问题，我们绘制的这张三维图上，是没有图注信息的。虽然我们可以根据代码中的颜色和形状来判断哪些是case，哪些是control，但是这样毕竟不方便，所以我们需要为图片加上图注。
+#绘制PCA散点图
+#旋转三维图，并更改点的大小
+#增加坐标轴信息
+#改变点的形状
+#增加图注
+s3d <- scatterplot3d(pca.data[, c("PC1", "PC2", "PC3")],
+              pch = shapes, color = colors，
+              angle = 60, cex.sumbols= 2,
+              main = "PCA plot")
+legend("bottom", legend = levels(pca.data$Type),
+       col = colors.lib, pch = shapes.lib,
+       inset = -0.25, xpd = TRUE, horiz = TRUE)
+这样，case 和control就一目了然了~
+
+
+
+### 7. 终级调整
+#当然，在这张图上，我们一共有10个样本，如果我们想知道哪些点代表哪些样本，通过这张图是非常不方便的。所以我们需要以text的方式，将样本名加在三维图中。
+#绘制PCA散点图
+#旋转三维图，并更改点的大小
+#增加坐标轴信息
+#改变点的形状
+#增加图注
+#标注样本名称
+s3d <- scatterplot3d(pca.data[, c("PC1", "PC2", "PC3")],
+              pch = shapes, color = colors，
+              angle = 60, cex.sumbols= 2,
+              main = "PCA plot")
+legend("bottom", legend = levels(pca.data$Type),
+       col = colors.lib, pch = shapes.lib,
+       inset = -0.25, xpd = TRUE, horiz = TRUE)
+text(s3d$xyz.convert(pca.data[, c("PC1", "PC2", "PC3")] + 0.05),
+     labels = pca.data$sample,
+     cex = 1, col = "black")
+#这样，每一个样本都可以看的清清楚楚。不过，如果是100个样本，我们想要将所有样本显示出来是非常不现实的，大部分我们只需要将特定的样本显示出来。给数据新建一个Label，显示那些重要的样本。
+
+#绘制PCA散点图
+#旋转三维图，并更改点的大小
+#增加坐标轴信息
+#改变点的形状
+#增加图注
+#标注特定样本名称
+lab.sample <- c("M4", "M1", "M7", "M10")
+pca.data$Label=""
+pca.data$Label[match(lab.sample, pca.data$sample)] <- lab.sample
+
+s3d <- scatterplot3d(pca.data[, c("PC1", "PC2", "PC3")],
+              pch = shapes, color = colors，
+              angle = 70, cex.sumbols= 2,
+              main = "PCA plot")
+legend("bottom", legend = levels(pca.data$Type),
+       col = colors.lib, pch = shapes.lib,
+       inset = -0.25, xpd = TRUE, horiz = TRUE)
+text(s3d$xyz.convert(pca.data[, c("PC1", "PC2", "PC3")] + 0.05),
+     labels = pca.data$Label,
+     cex = 1, col = "black")

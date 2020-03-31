@@ -1,0 +1,169 @@
+#!/usr/bin/Rscript
+
+
+# 1. 线图绘制
+#在R的基础绘图包中，无论是添加直线还是曲线，都是调用相应的低级绘图函数；而在ggplot中，线的地位提升了，是作为一种几何对象出现。
+
+#常见的线包括：
+#这些线都可以在ggplot中实现，使用函数geom_line()。
+#首先，加载ggplot2，查看帮助文档；
+
+library(ggplot2)
+?geom_line
+
+#这个包的参数并不多，很多参数之前也都提及过；
+#    lineend 线的末端类型
+#    linejoin 线交叉处的类型
+#    linemitre 斜接头的范围
+#    arrow 添加箭头
+#    direction: vh先画垂直后画水平，hv则相反;
+
+#用economics数据画个简单线图，查看一下数据结构；
+head(economics)
+
+#date	pce	pop	psavert	uempmed	unemploy
+#<date>	<dbl>	<dbl>	<dbl>	<dbl>	<dbl>
+#1967-07-01	507	198712	12.6	4.5	2944
+#1967-08-01	510	198911	12.6	4.7	2945
+#1967-09-01	516	199113	11.9	4.6	2958
+#1967-10-01	512	199311	12.9	4.9	3143
+#1967-11-01	517	199498	12.8	4.7	3066
+#1967-12-01	525	199657	11.8	4.8	3018
+
+
+#绘制 unemploy 随着 date 的变化曲线；
+ggplot(economics,aes(date,unemploy)) + geom_line(color = 'red')
+#展示的是失业人数和年份的关系；没什么好讲的，这里只是把颜色设置为红色了。
+
+#把数据点加进去，形成点线图；
+ggplot(economics,aes(date,unemploy)) + geom_line(color = 'red') + geom_point(color = 'blue')
+
+#如果geom_line和geom_point互换位置的话，线就会覆盖到点上；
+ggplot(economics,aes(date,unemploy))  + geom_point(color = 'blue') + geom_line(color = 'red')
+
+#对连续变量可以设置渐变色；
+ggplot(economics,aes(date,unemploy))  + geom_line(aes(color = unemploy)) + scale_color_gradient(high = "red",low = "green")
+
+#与其他图形一样，线也可以通过分类变量来设置线的类型；
+ggplot(economics_long,aes(date,value01)) + geom_line(aes(linetype = variable,color = variable))
+
+#接下来，看一下模型拟合曲线，使用几何对象函数geom_smooth；
+？geom_smooth
+
+#参数也不多：
+#    method 平滑拟合的方法：lm 线性模型，glm 广义线性模型，gam 广义加性模型，loess 纯粹平滑，rlm 稳健回归模型；
+#    formula 函数
+#    se 是否显示置信区间
+#    span 拟合程度，取值越小越平滑，也就越接近原始数据；
+#    level 设置置信区间的水平
+
+#用mpg数据测试，绘制拟合曲线；
+ggplot(mpg, aes(displ,hwy)) + geom_point() + geom_smooth(span = 0.2)
+
+#改变span平滑程度；
+ggplot(mpg, aes(displ,hwy)) + geom_point() + geom_smooth(span = 0.8)
+
+#默认拟合方法是loess，下面改变拟合方法；
+ggplot(mpg, aes(displ,hwy)) + geom_point() + geom_smooth(method = 'lm')
+
+#此外，还可以绘制色带图geom_ribbon；
+ggplot(economics,aes(date,unemploy))  + geom_line(aes(color = unemploy)) + scale_color_gradient(high = "red",low = "green") + 
+  geom_line(aes(date, unemploy + 500 * uempmed),color = "blue",linetype = 2) + 
+  geom_line(aes(date, unemploy - 500 * uempmed),color = "blue",linetype = 2) +
+  geom_ribbon(aes(date,ymin = unemploy - 500 * uempmed ,ymax = unemploy + 500 * uempmed ),fill = "skyblue", alpha = 0.2)
+
+#最后，在里面添加水平线geom_hline，垂直线geom_vline和有斜率的线geom_abline；
+ggplot(economics,aes(date,unemploy))  + geom_line(aes(color = unemploy)) + scale_color_gradient(high = "red",low = "green") + geom_line(aes(date, unemploy + 500 * uempmed),color = "blue",linetype = 2) + 
+  geom_line(aes(date, unemploy - 500 * uempmed),color = "blue",linetype = 2) +
+  geom_ribbon(aes(date,ymin = unemploy - 500 * uempmed ,ymax = unemploy + 500 * uempmed ),fill = "skyblue", alpha = 0.2) + 
+  geom_hline(yintercept = c(5000,10000),linetype = 4,color = c("green","red")) + 
+  geom_vline(xintercept = as.Date(c("1985-01-01","2005-01-01")),linetype = 6,color = "black") +
+  geom_abline(slope = 1,intercept = 15000)
+
+#其中，xintercept,yintercept设定x和y轴的位置，但是在geom_abline中，intercept是找到y轴位置，x轴已经定位在了第一个刻度标签处；slope设定斜率。
+
+
+
+### 2. 标签
+#标签在ggplot中也被提升到了几何对象水平；
+?geom_label
+
+#看一下有哪些参数；
+#    parse 是否解析数学表达式
+#    nudge_x,nudge_y 调整标签位置
+#    label.padding 标签周围填补范围
+#    label.r  标签半径
+#    label.size 标签边框大小
+#    check.overlap 是否避免覆盖
+
+#根据mtcars数据，把行名作为标签画出来；
+p + geom_label(aes(label = rownames(mtcars)))
+p + geom_text(aes(label = rownames(mtcars)))
+
+#可以看到，geom_label会在文本标签后面填充背景，而geom_text只是添加文本标签。
+#把标签点绘制出来，同时移动标签位置；
+p + geom_point() + geom_text(aes(label = rownames(mtcars)), nudge_x = 0.2,nudge_y = 1)
+#可以看到，以点为参考，我们可以将标签上下左右平移。
+
+#当然标签也可以转换角度；
+p + geom_point() + geom_text(aes(label = rownames(mtcars)), nudge_x = 0.2,nudge_y = 1,angle = 45)
+
+#对标签背景分类上色，这个和前面绘制点线等都是一样的；同时，这里可以设置字体格式和颜色；
+p + geom_label(aes(label = rownames(mtcars),fill = factor(cyl)),color = "yellow",fontface = "bold", family = "Times New Roman")
+
+#可以看到，标签的背景、字体和颜色都进行改变；
+#但是，如果用的是geom_text，就不能设置背景属性；
+p + geom_text(aes(label = rownames(mtcars),color = factor(cyl)),fontface = "bold", family = "Times New Roman")
+
+#现在的标签很拥挤，叠加严重；如果仅仅是把check.overlap设置为T，那一些标签就无法显示了；
+p + geom_text(aes(label = rownames(mtcars),color = factor(cyl)),check_overlap = T, fontface = "bold", family = "Times New Roman")
+#看着确实清楚了，但是丢失了很多标签信息。
+
+#我们可以用ggrepel包来把标签分散展示，从而完美解决这个问题。
+
+#安装加载ggrepel包；
+install.packages("ggrepel")
+library(ggrepel)
+
+#再次绘制这个图，设置链接线段为红色；
+p + geom_point() + geom_text_repel(aes(label = rownames(mtcars)), segment.colour = "red")
+#可以看到，标签都被很分散的分布于图片中，远离的标签会用红线链接起来。
+
+#绘制数学函数图时，常需要加入表达式标签，那表达式标签怎么显示呢？
+#创建一个矩阵，包括x和y两列数据，而y是根据x计算来的；
+x <- 1:8
+y <- 1.2 + x^2
+df <- data.frame(x,y)
+
+#绘制点和拟合曲线，把y的计算表达式绘制上去；
+ggplot(df,aes(x,y)) + geom_point() + geom_smooth() + geom_text(aes(x= 4,y =40),label = 'y == 1.2 + x^2', parse = T, size = 7)
+#这里要注意，在表达式标签中要用 ==；
+
+#最后，来看一下添加单个标签应该怎么做；
+#在图片中加入“I love R”单个标签，标为红色字体；
+ggplot(df,aes(x,y)) + geom_point() + geom_smooth() + geom_text(aes(x= 4,y =40),label = 'y == 1.2 + x^2', parse = T, size = 7) + 
+  annotate("text",x = 2,y = 55,label = "I love R", size = 10,color = "red", family = "Times New Roman")
+
+#除了加入文本，annotate还可以加入矩形；
+ggplot(df,aes(x,y)) + geom_point() + geom_smooth() + geom_text(aes(x= 4,y =40),label = 'y == 1.2 + x^2', parse = T, size = 7) + 
+  annotate("rect",xmin = 3,ymin = 30, xmax = 5,ymax = 50, alpha = 0.2, fill = "green")
+
+#加入线段；
+ggplot(df,aes(x,y)) + geom_point() + geom_smooth() + geom_text(aes(x= 4,y =40),label = 'y == 1.2 + x^2', parse = T, size = 7) + 
+  annotate("segment",x = 4,xend = 6, y = 25,yend = 50,color = "red")
+
+#加入点线；
+ggplot(df,aes(x,y)) + geom_point() + geom_smooth() + geom_text(aes(x= 4,y =40),label = 'y == 1.2 + x^2', parse = T, size = 7) + 
+  annotate("pointrange",x = 3,y = 40, ymin = 30,ymax = 50, color = "green",size =2)
+
+#这个点线可以竖着，也可以横着；
+ggplot(df,aes(x,y)) + geom_point() + geom_smooth() + geom_text(aes(x= 4,y =40),label = 'y == 1.2 + x^2', parse = T, size = 7) + 
+  annotate("pointrange",x = 3,y = 30, xmin = 2,xmax = 4, color = "green",size =2)
+
+#但是不能同时横着竖着，也就是说不能一次画出十字架✝️。但是可以分两次画。
+ggplot(df,aes(x,y)) + geom_point() + geom_smooth() + geom_text(aes(x= 4,y =40),label = 'y == 1.2 + x^2', parse = T, size = 7) + 
+  annotate("rect",xmin = 1,ymin = 30, xmax = 3,ymax = 60, fill = "purple") + 
+  annotate("pointrange",x = 2,y = 50,xmin = 1.2,xmax = 2.8,color = "red",size = 3) +
+  annotate("pointrange",x = 2,y = 50,ymin = 33,ymax = 57,color = "red", size =3)
+
+#几何对象画了很多，其实发现很多东西都能举一反三，互相借鉴。

@@ -1,0 +1,60 @@
+#!/usr/bin/Rscript
+
+
+#ggplot2直方图geom_histogram
+#查看帮助文档；
+?geom_histogram
+
+#可以看到，geom_histogram还有两个兄弟，geom_freqpoly是用于绘制频率多边形；stat_bin是统计变换函数，这里我们先只玩geom_histogram。
+#    binwidth 直方条的宽度；
+#    bins 直方条的个数，默认30个；
+
+#如果以上两个参数都设置了，则bins参数会被binwidth参数覆盖，bins也就不起作用了。
+#绘制直方图，我们用之前生成的sdata数据，数据集比较大，看着舒服。先查看数据结构；
+
+head(sdata)
+
+#A tibble: 6x10
+#carat	cut	color	clarity	depth	table	price	x	y	z
+#<dbl>	<ord>	<ord>	<ord>	<dbl>	<dbl>	<int>	<dbl>	<dbl>	<dbl>
+#1.02	Good	G	VS2	63.8	59	6080	6.34	6.27	4.02
+#0.31	Ideal	F	VVS1	61.9	53.5	882	4.36	4.39	2.71
+#0.6	Premium	D	SI2	61.3	61	1428	5.46	5.4	3.33
+#0.41	Ideal	E	IF	62.1	54	1419	4.75	4.81	2.97
+#0.72	Very Good	H	VS1	62.2	54	2877	5.74	5.76	3.57
+#1.2	Ideal	F	VS2	62.6	56	8486	6.78	6.73	4.23
+
+#绘制画布；
+p <- ggplot(sdata,aes(carat))
+
+#画直方图；
+p + geom_histogram(fill = 'sky blue')
+#可以看到，直方图的x轴是连续型变量，而条形图一般是分类变量。当然，作死的人也可以用连续变量画条形图。
+
+#设置一下直方条宽；
+p + geom_histogram(fill = 'sky blue', binwidth = 0.01)
+
+#这时条就变得细了很多，我们也可以设置条的个数，默认30个，这里设置20看看；
+p + geom_histogram(fill = 'sky blue', bins = 20)
+
+#确实，条数少了就变胖了。试试两个一起设置看看；
+p + geom_histogram(fill = 'sky blue',binwidth = 0.01, bins = 20)
+p + geom_histogram(fill = 'sky blue', bins = 20,binwidth = 0.01)
+#不管这两个参数的前后顺序如何，最后都是binwidth参数会覆盖bins参数。
+
+#此外，同样也可以根据不同类别来进行填充颜色；
+p + geom_histogram(aes(fill = cut),binwidth = 0.1)
+
+#也可以换position参数，来看分类颜色的显示结果；
+p + geom_histogram(aes(fill = cut),binwidth = 0.1,position = 'dodge')
+#这时候就感觉很挤，不是太好看。
+
+#让y轴显示概率密度；
+ggplot(sdata,aes(carat,..density..)) + geom_histogram(fill = 'blue',color = 'black')
+#这里的语法就是把density放在4个.中：..density..，具体我也说不明白
+
+#当然，在ggplot中画概率密度曲线是有专门的函数geom_density；
+p + geom_density(aes(fill = cut, color = cut),alpha = 0.2) + scale_color_manual(values = c('yellow','blue','green','orange','red'))
+
+#默认position是identity，也可以设置为stack；
+p + geom_density(aes(fill = cut, color = cut),alpha = 0.2,position = 'stack') + scale_color_manual(values = c('yellow','blue','green','orange','red'))

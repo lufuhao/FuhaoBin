@@ -1,0 +1,91 @@
+#!/usr/bin/Rscript
+
+#ggplot2笔记之几何对象～条形图 
+#https://mp.weixin.qq.com/s?__biz=MzU5MDU5NTIzMQ==&mid=2247484887&idx=1&sn=6c39bdc40dc8bd71a7ff05d126407d4f&chksm=fe3a9027c94d1931f0a3c06b3408541ae6a61af3254da35724643b17614f620db0d6679ee20f&mpshare=1&scene=24&srcid=&sharer_sharetime=1584966033405&sharer_shareid=fd909411f84f86d5a6fd92415a84e9b8#rd
+
+#条形图最主要的是展示离散型数据。ggplot中，绘制条形图的几何对象函数是geom_bar。话不多说，开始玩起来！
+#首先，加载ggplot2包，查看geom_bar的帮助文档；
+library(ggplot2)
+?geom_bar
+
+#大部分的参数和geom_point一样，这里看一下不同的参数：
+#    width 设置图中条形的宽度
+#    binwidth 在条形图中不起作用了，这里先不管。
+
+
+#小试牛刀，画一个简单的条形图。
+#使用默认数据mpg，看一下它的结构；
+head(mpg)
+
+#根据class分类变量绘制条形图；
+p <- ggplot(mpg,aes(class))
+p + geom_bar()
+
+#这个图显示了不同分类的数目，如果我们想知道不同class的displ数目，这时候就需要转变y轴的内容，使用weight参数设置权重。
+p + geom_bar(aes(weight = displ))
+
+#当然，这时候最好改变一下y轴的名称，比如“count on displ”；
+p + geom_bar(aes(weight = displ)) + ylab('count on displ')
+
+#如果需要改变x轴名称，就使用xlab函数就可以。接下来，我们画画更有意思的条形图。
+#用之前随机筛选的钻石数据sdata，绘制条形图；
+p <- ggplot(sdata,aes(color))
+p + geom_bar(aes(fill = cut), position = 'dodge')
+
+#可以看到，x是color，利用cut变量来进行填充颜色；position设置为‘dodge’，表示相邻排列，也就是说对每一种cut都水平排列开。
+#我们换一换；
+p + geom_bar(aes(fill = cut), position = 'fill') + ylab('percent cut %')
+
+#可以看到，如果position参数换成“fill”，条形图就会填充整个图形高度，但是这时候的y轴就变成了计数的百分比。也就可以看出cut每个水平的占比情况。
+#再换一个；
+p + geom_bar(aes(fill = cut), position = 'stack') + ylab('total cut')
+
+
+
+#这里使用的是“stack”，表示堆栈。这是函数默认的参数，可以看到每个cut都堆叠到一起了，从而既可以看出总体的计数，又可以显示不同cut的计数情况。
+#再来；
+p + geom_bar(aes(fill = cut), position = 'identity')
+#当换成“identity”时，这个图形y轴和“dodge”时是一样的，只不过现在变成了单一条形，这是因为其他颜色条都被黄色的Ideal给挡住了。
+
+
+#我们可以使用透明度alpha参数，把他们给显示出来。
+p + geom_bar(aes(fill = cut, alpha = cut), position = 'identity') + scale_alpha_manual(values = c(1,0.8,0.6,0.4,0.2))
+
+#此外，我们看看颜色填充的设置；
+p + geom_bar(aes(fill = cut)) + scale_fill_brewer(type = 'qual')
+
+#用的仍然是我们的标度函数。
+p + geom_bar(aes(fill = cut)) + scale_fill_brewer(type = 'qual',palette = 2,direction = -1)
+
+#在标度函数scale_fill_brewer中，参数palette是设置使用哪个调色板，direction设置颜色是正向取还是反向去。
+
+#除了画这种正常的条形图，水平放置的条形图怎么玩呢？
+p + geom_bar(aes(fill = cut)) + scale_fill_brewer(type = 'qual',palette = 2,direction = -1) + coord_flip()
+
+#最后，需要学习一下误差线的绘制geom_errorbar。
+#自定义一个数据框df；
+df <- data.frame(mean_value = c(18,20,23,16,24,15),
+                 group = factor(LETTERS[1:6]),
+                 sd = c(1.4,1.7,1.5,2.1,1,1.8)
+                 )
+df$lower = with(df, mean_value - 1.5*sd)
+df$upper = with(df, mean_value + 1.5*sd)
+df
+
+#绘制条形图；
+p <- ggplot(df,aes(group, mean_value))
+p + geom_bar(fill = 'grey',stat = 'identity')
+
+#接下来，添加误差线；
+p + geom_bar(fill = 'grey',stat = 'identity') + geom_errorbar(aes(ymin = lower,ymax = upper),width = 0.3, color = 'black')
+
+#此外，还有一种误差线，就是点上的误差线；
+p + geom_point() + geom_line() + geom_pointrange(aes(ymin = lower,ymax = upper),color = 'red')
+
+#我们可以将x轴和y轴互换；
+ggplot(df,aes(mean_value,group)) + geom_point() + geom_line() + geom_errorbarh(aes(xmin = lower,xmax = upper),height = 0.1,color = 'blue')
+
+#这时候用到的是geom_errorbarh，这h就是水平(horizontal)的意思。那这里直接用前面说到的coordinat_flip函数可不可以呢？
+p + geom_point() + geom_line() + geom_pointrange(aes(ymin = lower,ymax = upper),color = 'red') + coord_flip()
+
+#结果也是可以的。今天就学这么多，具体条形图很多的细节调整，还需要以后进一步看R自带的帮助文档了！
