@@ -99,7 +99,7 @@ Options:
 Example:
   $0 \\
       -i1 ./sp1.fa.gz -i2 ./sp2.fa.gz -g1 ./sp1.gff.gz -g2 ./sp2.gff.gz \\
-      -p1 sp1 -p2 sp2 -fmt pep -type mRNA -key ID -mp 30 -mz 10
+      -p1 sp1 -p2 sp2 -mt pep -type mRNA -key ID -mp 30 -mz 10 -nsn
 
 Author:
   Fu-Hao Lu
@@ -479,6 +479,8 @@ if [ ! -s $path_plot/$opt_p1.$opt_p2.pdf ]; then
 		exit 100
 	fi
 	mv karyotype.pdf $path_plot/$opt_p1.$opt_p2.pdf
+	python -m jcvi.graphics.karyotype --dpi=600 --format=eps --font=Arial $path_plot/$opt_p1.$opt_p2.seqids $path_plot/$opt_p1.$opt_p2.layout > $opt_p1.$opt_p2.graphics.karyotype.log 2>&1
+	python -m jcvi.graphics.karyotype --dpi=600 --format=png --font=Arial $path_plot/$opt_p1.$opt_p2.seqids $path_plot/$opt_p1.$opt_p2.layout > $opt_p1.$opt_p2.graphics.karyotype.log 2>&1
 fi
 echo -e "\n\n\n"
 
