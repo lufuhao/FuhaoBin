@@ -1,0 +1,160 @@
+#!/usr/bin/Rscript
+
+#https://mp.weixin.qq.com/s/1oi5NL-W5BWjaYlvVQ1OMQ
+
+
+###安装所需的R包
+library(tidyverse)
+library(sf)
+library(tmap)
+library(spData)
+library(viridis)
+library(lubridate)
+
+
+###下载数据
+#最新数据可以从Johns Hopkins University Center for SystemsScience and Engineering (JHU CSSE)下载：https://systems.jhu.edu
+#Github上有整理好的数据（https://github.com/CSSEGISandData/COVID-19），我们直接下载。
+
+
+
+#确诊病例的数据：
+Confirmed<- read_csv(url("https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/archived_data/archived_time_series/time_series_19-covid-Confirmed_archived_0325.csv"))
+
+###选取最新数据
+#选取写文章时的最新数据：
+Confirmed_Newest <- dplyr::select(Confirmed, `Province/State`, `Country/Region`, Lat, Long,`3/23/20`)
+
+
+
+###单独查看某个地区或者某几个地区的情况
+#一个地区（英国为例）：
+UK <- Confirmed_Newest %>% filter(`Country/Region`=="United Kingdom")
+
+
+##两个及以上地区（澳大拉西亚为例：澳大利亚、新西兰和邻近的太平洋岛屿。）
+Australasia <- Confirmed_Newest %>% filter(`Country/Region` %in% c("Australia", "New Zealand"))
+
+
+
+#以美国本土的情况为例
+#改一下变量名，后面用起来会更方便。
+US_Newest <- Confirmed_Newest %>% filter(`Country/Region`=="US") %>% select(-`Country/Region`) %>% rename(State=`Province/State`, Confirmed=`3/23/20`)
+
+
+
+#但我们查看数据会发现，US_Newest远不止州级水平的数据，而是有249行数据（查看：nrow(US_Newest)），这其中包括很多县级水平的数据，甚至还有“钻石公主号”邮轮和“至尊公主号”邮轮的数据。没有关系，我们马上用地理数据一下子就能把它们清理利落。
+
+
+###加载地理数据
+#使用spData包里的美国本土地理数据us_states（注意：spData是一个地理数据教学包，请根据情况酌情使用），用这个地理数据“剪切”出美国本土对应的疫情数据。
+data(us_states)
+cov_US <- left_join(us_states, US_Newest, by = c("NAME" = "State"))
+nrow(cov_US)
+
+
+
+###作图
+#还用第二期讲解的tmap包。若想把图做得好看一点，可以根据需要改变边界的粗细和颜色、背景的颜色、图例的位置和标识，比如我这里把图例在10,1000, 100000处分割，可以影响数据分布的形状，将右偏数据的长尾拖近，让可视化效果更好。
+
+
+
+breaks <- c(10, 1000, 100000)
+tm_shape(cov_US) +
+  tm_polygons(border.col="white", 
+              lwd=2, 
+              col="Confirmed", 
+              style = "cont",
+              breaks=breaks, 
+              title="Confirmed rate", 
+              palette=viridis(n=5, direction=-1, option="A")) +
+  tm_legend(position=c("left", "bottom"), 
+            legend.title.size=1.5, 
+            legend.text.size=1) +
+  tm_layout(bg.color = "grey90")
+
+#从上图中可以看到，纽约州的确诊病例太多，远超第二名，这样就导致病例少的州的颜色水平就看不出明显差异了。对于这种右偏数据，一个小窍门是我们可以直接用style= "log10"在图上进行对数转换。我们用下面这种作图风格。
+labels <- c("10", "1000", "100000")
+tm_shape(cov_US) +
+  tm_polygons(border.col="white", 
+              lwd=2, 
+              col="Confirmed",
+              style = "log10",
+              labels=labels,
+              title="Confirmed rate",
+              palette=viridis(n=5, direction=-1, option="A")) +
+  tm_legend(position=c("left", "bottom"), 
+            legend.title.size=1.5, 
+            legend.text.size=1) +
+  tm_layout(bg.color = "grey90")
+
+
+
+#接下来，就是今天炫酷的操作了，制作一张疫情发展的时间序列动态图：
+#作时间序列动图前的准备
+#选取最近两周的数据为例
+US <- Confirmed %>% 
+  filter(`Country/Region`=="US") %>% 
+  select(`Province/State`, c(`3/10/20`:`3/23/20`)) %>% 
+  rename(State=`Province/State`)
+
+
+
+#用地理数据us_states里的各州名称截取疫情数据里的州级数据
+NAME <- us_states %>% 
+  select(NAME) %>% 
+  st_drop_geometry() %>% 
+  as_tibble()
+US <- left_join(NAME, US, by = c("NAME" = "State"))
+nrow(US)
+ncol(US)
+
+
+
+#现在的数据是上面这种情况，每一个日期单独是一列数据，分散在第2到第15列。我们要把这种“长格式”的数据转化成“短格式”的数据，让所有的日期都集中在一列，对应的病例数据集中在另一列，类似于Excel中pivottable的功能，生成下面这种形式。
+Date <- colnames(US)[2:15]
+US_ByDate <- US %>% pivot_longer(Date, names_to = "Date", values_to = "Cases")
+
+
+
+#此时查看数据，会发现日期这一列是character型（chr），这样子会让后面的动图顺序错位，我们要把日期这一列纠正成date型，要用到lubridate这个包。
+US_ByDate <- mutate(US_ByDate, Date_N=mdy(Date))
+
+
+
+#用full_join函数合并地理数据，同时保留两个数据集的特征。
+cov_US <- full_join(us_states, US_ByDate, by="NAME")
+
+
+
+#作分面图
+#分面图是动图的基础。按照上面讲的作最新日期图的方法，来作个分面图了解一下大概情况
+breaks <- c(0, 1, 10, 100, 1000, 10000, 100000)
+tm_shape(cov_US) +
+  tm_polygons(col="Cases",
+              breaks=breaks, 
+              title="Confirmed cases",
+              palette=viridis(n=5, direction=-1, option="A")) +
+  tm_facets(by = "Date_N", nrow = 5, free.coords = FALSE) +
+  tm_layout(legend.position=c(-0.6, -0.01))
+
+
+
+#作按时间发展的动图
+#动图效果如下图：
+#由分面图改为动图其实很简单，就是把by = "Date_N"改为along= "Date_N"。保存动图需要下载安装ImageMagick软件（https://imagemagick.org）。
+anim_US <- tm_shape(cov_US) +
+  tm_polygons(border.col="white", 
+              lwd=1, 
+              col="Cases",
+              breaks=breaks, 
+              title="Confirmed cases", 
+              palette=viridis(n=5, direction=-1, option="A")) +
+  tm_facets(along = "Date_N", free.coords = FALSE) +
+  tm_layout(bg.color = "grey90", legend.position=c("right", "bottom"))
+tmap_animation(anim_US, filename = "anim_US.gif", delay = 50, width = 7, height = 4)
+
+
+
+###小伙伴们学会了吗？那么试着自己做一份文章开头那样的世界地图的动图吧。
+###从这些时间轴动图上可以看出，病毒的传播真的非常快。希望疫情快快过去，我们的生活早日恢复正常！我们这个系列暂时告一段落了，希望这三期介绍的内容可以不必用于疫情，而是我们自己的学科研究中。 
