@@ -1,0 +1,39 @@
+#!/usr/bin/env Rscript
+args = commandArgs(trailingOnly=TRUE)
+
+
+if (length(args)==0) {
+  stop("At least one argument must be supplied (input file).n", call.=FALSE)
+} else if (length(args)==1) {
+  # default output file
+  args[2] = 0.0012
+}
+
+InputData <- args[1]
+OutputPDF <- args[2]
+
+data <- read.table(file=InputData,header=F)
+poisson_expeact_K=function(file,start=3,end=200,step=0.1){
+	diff<-1e20
+	min<-1e20
+	pos<-0
+	total<-sum(as.numeric(file[start:dim(file)[1],1]*file[start:dim(file)[1],2]))
+	singleCopy_total <- sum(as.numeric(file[10:500,1]*file[10:500,2]))
+	for (i in seq(start,end,step)) {
+		singleC <- singleCopy_total/i
+		a<-sum((dpois(start:end, i)*singleC-file[start:end,2])^2)
+		if (a < diff){
+			pos<-i
+			diff<-a
+		}
+	}
+	print(paste("Total kmer bases: ", total))
+	print(paste("Kmer depth: ", pos))
+	print(paste("Genome size: ", total/pos))
+	pdf(OutputPDF)
+	plot(1:200,dpois(1:200, pos)*singleC, type = "l", col=3, lwd=2, lty=2,
+	ylim=c(0,150000), xlab="K-mer coverage",ylab="K-mer counts frequency")
+	lines(file[1:200,],type="l",lwd=2)
+	dev.off()
+}
+poisson_expeact_K(data)

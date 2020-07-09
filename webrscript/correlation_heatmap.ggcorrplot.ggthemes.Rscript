@@ -1,0 +1,76 @@
+#!/usr/bin/Rscript
+
+### source: https://mp.weixin.qq.com/s/KKxI4H1xjiRe7MZzDKVySA
+### 微信公众号：科研猫
+
+
+#安装ggcorrplot包
+install.packages("ggcorrplot")
+install.packages("ggthemes")
+#加载ggcorrplot包
+library(ggcorrplot)
+library(ggthemes)
+
+
+#读取数据
+data <- read.table("expression.txt", header=T, row.names=1)
+#显示文件未读
+dim(data)
+#显示文件前6行
+head(data)
+
+#	M1	M2	M3	M4	M5	M6	M7	M8	M9	M10
+#RGL4	8.45	8.01	8.99	9.71	7.90	4.14	4.98	4.57	4.93	4.29
+#MPP7	8.69	8.63	7.08	9.83	8.27	5.17	5.20	3.26	5.56	4.30
+#UGCG	8.64	8.60	9.43	7.92	8.30	4.90	5.75	4.49	4.65	3.30
+#CYSTM	8.62	9.23	8.48	8.95	7.35	4.54	6.37	4.24	4.74	3.44
+#ANXA2	4.98	6.74	6.22	4.71	3.28	8.08	10.63	7.21	9.00	5.12
+#ENDOD1	5.55	5.40	4.66	3.55	4.10	8.39	9.53	9.06	8.63	7.10
+
+#计算基因与基因之间的相关性
+corr <- round(cor(t(data)),3)
+#显示前6个基因之间的相关性
+head(corr[,1:6])
+
+
+#检验基因与基因之间相关性p值
+p.mat <- round(cor_pmat(t(data)),3)
+#显示前6个基因之间的相关性的p值
+head(pmat[,1:6])
+
+
+#绘制基因与基因间相关性热图
+ggcorrplot(corr)
+
+###初级美化
+#绘制环形相关性
+ggcorrplot(corr, method = "circle")
+
+###中级美化
+#绘制环形相关性热图
+#对基因进行聚类，聚类算法为ward.D，并去除边界
+#更改相关性图形样式
+ggcorrplot(corr, method = "circle", hc.order=TRUE, hc.method="ward.D", outline.col="white", ggtheme = theme_bw())
+
+###高级初级美化
+#绘制环形相关性热图
+#对基因进行聚类，聚类算法为ward.D，并去除边界
+#只绘制相关性上部分
+ggcorrplot(corr, method = "circle", hc.order=TRUE, hc.method="ward.D", outline.col="white", ggtheme = theme_bw(),type="upper")
+
+###终级美化
+#绘制环形相关性热图
+#对基因进行聚类，聚类算法为ward.D，并去除边界
+#只绘制相关性上部分
+#更改相关性热图颜色
+#显示相关性系数
+ggcorrplot(corr, method = "circle", hc.order=TRUE, hc.method="ward.D", outline.col="white", ggtheme = theme_bw(),type="upper", color=c("#6D9EC1", "white", "#E46726"), lab=TRUE, lab_size=2)
+
+###究级美化
+#绘制环形相关性热图
+#对基因进行聚类，聚类算法为ward.D，并去除边界
+#只绘制相关性上部分
+#更改相关性热图颜色
+#显示相关性系数
+#隐藏p>0.05的基因
+ggcorrplot(corr, method = "circle", hc.order=TRUE, hc.method="ward.D", outline.col="white", ggtheme = theme_bw(),type="upper", color=c("#6D9EC1", "white", "#E46726"), lab=TRUE, lab_size=2, p.mat=p.mat, insig="blank")

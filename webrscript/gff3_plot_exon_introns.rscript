@@ -1,0 +1,27 @@
+#!/usr/bin/Rscript
+
+#requirements
+#	GenomicFeatures
+#	ggbio
+
+#R语言可视化展示gff3格式基因组注释文件的简单小例子
+#https://mp.weixin.qq.com/s/wEsQLuLE69uCJnCDrnYzFw
+
+
+library(GenomicFeatures)
+txdb<-makeTxDbFromGFF(file="practice.gff",format="gff3")
+library(ggbio)
+autoplot(txdb, which=GRanges("CP002684.1", IRanges(100, 9000)),
+         names.expr = "gene_id")+
+  theme_bw()
+
+#可以通过fill参数设置不同的颜色
+autoplot(txdb,
+         which=GRanges("CP002684.1", IRanges(100, 9000)),
+         names.expr = "gene_id",fill="red")+
+  theme_bw()
+
+#不同的基因填充不同的颜色
+autoplot(txdb, which=GRanges("CP002684.1", IRanges(100, 9000)),
+         names.expr = "gene_id",aes(fill=gene_id))+
+  theme_bw()
