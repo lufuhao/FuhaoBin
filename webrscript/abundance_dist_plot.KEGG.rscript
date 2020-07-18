@@ -1,0 +1,103 @@
+#!/usr/bin/Rscript
+
+
+### https://mp.weixin.qq.com/s/-nHL4Ch30j4NkzwhZshyKA
+
+### Requirements
+#	ggplot2
+#	reshape2
+
+### 在每一个大类的代谢通路中，被系统分类为二、三、四层。
+### 第二层目前包括有 39 种子功能；第三层即为其代谢通路图；第四层为每个代谢通路图的具体注释信息。
+### 使用PICRUSt2等功能预测工具得到的KEGG路径预测结果同样是有层级的，当我们想要知道样本中微生物群落的功能主要涉及哪些路径时，就需要对这些具有层级的功能预测结果进行绘图。
+### 一般情况下在图像中会展示第一和第二层级，因为三、四层级条目过多，在一幅图中进行展示也看不清，通常会挑选感兴趣的特定功能单独呈现。
+
+
+
+### 绘图数据
+### 绘图数据是一个简单的三列表格，包括第二层级的39个代谢路径及其对应的第一层级信息，还有就是每个代谢路径在所有样本中的平均相对丰度。
+#L2  Abundance   L1
+#Amino Acid Metabolism   10.85226441 Metabolism
+#Biosynthesis of Other Secondary Metabolites 0.801473685 Metabolism
+#Cancers 0.200218503 Human Diseases
+#Carbohydrate Metabolism 9.825700857 Metabolism
+#Cardiovascular Diseases 0.041676219 Human Diseases
+#Cell Communication  4.10266E-06 Cellular Processes
+#Cell Growth and Death   0.668258507 Cellular Processes
+#Cell Motility   3.096523213 Cellular Processes
+#Cellular Processes and Signaling    3.677857914 Unclassified
+#Circulatory System  0.060426072 Organismal Systems
+#Digestive System    0.034029538 Organismal Systems
+#Endocrine System    0.429947803 Organismal Systems
+#Energy Metabolism   5.258382179 Metabolism
+#Environmental Adaptation    0.122299017 Organismal Systems
+#Enzyme Families 1.611986904 Metabolism
+#Excretory System    0.036944139 Organismal Systems
+#"Folding, Sorting and Degradation"  1.870783913 Genetic Information Processing
+#Genetic Information Processing  2.156849956 Unclassified
+#Glycan Biosynthesis and Metabolism  1.514849861 Metabolism
+#Immune System   0.03512324  Organismal Systems
+#Immune System Diseases  0.03064279  Human Diseases
+#Infectious Diseases 0.436744548 Human Diseases
+#Lipid Metabolism    4.065468628 Metabolism
+#Membrane Transport  14.44885951 Environmental Information Processing
+#Metabolic Diseases  0.06854832  Human Diseases
+#Metabolism  2.674580389 Unclassified
+#Metabolism of Cofactors and Vitamins    3.881796165 Metabolism
+#Metabolism of Other Amino Acids 2.240721722 Metabolism
+#Metabolism of Terpenoids and Polyketides    2.289844274 Metabolism
+#Nervous System  0.088760089 Organismal Systems
+#Neurodegenerative Diseases  0.473060296 Human Diseases
+#Nucleotide Metabolism   2.88274028  Metabolism
+#Poorly Characterized    4.979860933 Unclassified
+#Replication and Repair  5.732190185 Genetic Information Processing
+#Sensory System  1.36755E-06 Organismal Systems
+#Signal Transduction 2.234900385 Environmental Information Processing
+#Signaling Molecules and Interaction 0.154447485 Environmental Information Processing
+#Transcription   2.218062373 Genetic Information Processing
+#Translation 3.399197178 Genetic Information Processing
+#Transport and Catabolism    0.372610694 Cellular Processes
+#Xenobiotics Biodegradation and Metabolism   5.031362346 Metabolism
+
+
+
+### 因为目的是获得所有样本中的主要功能，因此绘图数据需要提前计算一下每一个代谢路径在所有样本中的平均丰度。
+
+
+
+### 图像绘制
+### 使用ggplot2的分面模式来展示不同代谢路径所属的第一层KEGG信息，应用条形图表示每一个代谢路径的相对丰度。
+### 首先导入分析数据。
+KEGG <- read.table("L2.txt",header = TRUE,sep = "\t")
+
+library(ggplot2)
+library(reshape2)
+### 这里有一点需要说明，因为KEGG第一层分类中有几个分类的名字特别长，因此需要处理一下，使其能够实现自动换行。
+swr = function(string, nwrap = 12){
+          paste(strwrap(string,width = nwrap),collapse = "\n")
+}
+swr = Vectorize(swr)
+KEGG$L1 <- swr(KEGG$L1)
+
+p <- ggplot(KEGG,aes(Abundance,L2)) +
+  geom_bar(aes(fill = L1),stat = "identity",width = 0.6) +
+  xlab("Relative abundance (%)") + 
+  ylab("KEGG Pathway") +
+  theme(panel.background = element_rect(fill = "white",colour='black'),
+        panel.grid.major = element_line(color = "grey",linetype = "dotted",size = 0.3),
+        panel.grid.minor = element_line(color = "grey",linetype = "dotted",size = 0.3),
+        axis.ticks.length = unit(0.4,"lines"), 
+        axis.ticks = element_line(color='black'),
+        axis.line = element_line(colour = "black"), 
+        axis.title.x=element_text(colour='black', size=20,face = "bold"),
+        axis.title.y=element_text(colour='black', size=20),
+        axis.text.x=element_text(colour='black',size=20),
+        axis.text.y = element_text(color = "black",size = 12),
+        legend.position = "none",
+        strip.text.y = element_text(angle = 0,size = 12,face = "bold")) +
+  facet_grid(L1~.,space = "free_y",scales = "free_y",switch = "y")
+
+
+png(filename="L2.png",res=600,height=7200,width=6000)
+p
+dev.off()
