@@ -136,15 +136,15 @@ SrrDownloadUsingAscp() {
 		URL="anonftp@ftp-private.ncbi.nlm.nih.gov:/sra/sra-instant/reads/ByRun/sra/SRR/${PATH1}/${PATH2}/${SDUCsrr}.sra"
 		echo "($SDUCsub)Info: Downloading: $URL"
 		echo "($SDUCsub)Info: Saving to: $Sra_File"
-		ascp $opt_n $URL $opt_d
+		ascp $opt_n $URL $opt_d >$Sra_File.ascp.log 2>&1
 		if [ $? -ne 0 ]; then
 			echo "($SDUCsub)Error: ascp failed to download SRR: $SDUCsrr" >&2
 			echo "($SDUCsub)Error: CMD used: ascp $opt_n $URL $opt_d" >&2
 			return 100;
 		else # Move to local file only if successful.
-			mv $Tmp_File $Sra_File
-			if [ -e $Sra_File.curl.err ]; then
-				rm $Sra_File.curl.err >/dev/null 2>&1
+#			mv $Tmp_File $Sra_File
+			if [ -e $Sra_File.ascp.log ]; then
+				rm $Sra_File.ascp.log >/dev/null 2>&1
 			fi
 		fi
 	else

@@ -43,15 +43,15 @@ echo "RunDir: $RunPath"
 help() {
 cat<<HELP
 
-$0 --- download SRR using prefetch in SRA-toolkit
+$0 --- download fastq from ENA using ascp in Aspera-Connect
 
 Version: v20200723
 
 Requirements:
-	SRA-toolkit
+	Aspera Connect
 
 Descriptions:
-  Download SRA files directly using SRA-toolkit
+  Download Fastq.gz files directly from ENA using Aspera-Connect
     should be better than wget or curl
 
 Options: 
@@ -59,8 +59,9 @@ Options:
   -f    SRR list file
   -i    SRR names, comma delimited
   -d    Output Path
-  -n    Options for prefetch
-          Default:  --max-size 50G
+  -n    Options for ascp
+          Default:  -k 1 -QT -l 300m -P 33001 -v -T \
+          -i $HOME/.aspera/connect/etc/asperaweb_id_dsa.openssh 
 
 Example:
 
@@ -88,7 +89,7 @@ echo -e "\n######################\nProgram $ProgramName initializing ...\n######
 declare -a SRRlist=()
 opt_f=""
 opt_d=$PWD
-opt_n=" --max-size 50G "
+opt_n=" -k 1 -QT -l 300m -P 33001 -v -i $HOME/.aspera/connect/etc/asperaweb_id_dsa.openssh -T "
 #################### Parameters #####################################
 while [ -n "$1" ]; do
   case "$1" in
@@ -122,35 +123,56 @@ SrrDownloadUsingAscp() {
 	
 	local SDUCsub="(SrrDownloadUsingCurl)"
 	# Create the full path to the file.
-	local Sra_File="$opt_d/$SDUCsrr.sra"
-	local Tmp_File="$opt_d/$SDUCsrr.tmp"
+	local Sra_File="$opt_d/$SDUCsrr.R1.fastq.gz"
 	
 	echo "($SDUCsub)Info: Getting SRR run: $SDUCsrr"
 
 	cd $opt_d
+	PATH1=${SDUCsrr:0:6}
+	PATH2=${SDUCsrr:0:10}
 	# Download only if it does not exist.
 	if [ ! -f $Sra_File ]; then
-#		PATH1=${SDUCsrr:0:6}
-#		PATH2=${SDUCsrr:0:10}
-#		URL="anonftp@ftp-private.ncbi.nlm.nih.gov:/sra/sra-instant/reads/ByRun/sra/SRR/${PATH1}/${PATH2}/${SDUCsrr}.sra"
-#		echo "($SDUCsub)Info: Downloading: $URL"
+		URL="era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/${PATH1}/${PATH2}/${SDUCsrr}_1.fastq.gz"
+		echo "($SDUCsub)Info: Downloading: $URL"
 		echo "($SDUCsub)Info: Saving to: $Sra_File"
-		prefetch $opt_n -O $opt_d --output-file $Tmp_File $SDUCsrr > $Sra_File.prefetch.log 2>&1
+		ascp $opt_n $URL $opt_d
 		if [ $? -ne 0 ]; then
-			echo "($SDUCsub)Error: ascp failed to download SRR: $SDUCsrr" >&2
+			echo "($SDUCsub)Error: ascp failed to download R1: $SDUCsrr" >&2
 			echo "($SDUCsub)Error: CMD used: ascp $opt_n $URL $opt_d" >&2
 			return 100;
 		else # Move to local file only if successful.
-			mv $Tmp_File $Sra_File
-			if [ -e $Sra_File.prefetch.log ]; then
-				rm $Sra_File.prefetch.log >/dev/null 2>&1
+			mv ${SDUCsrr}_1.fastq.gz ${SDUCsrr}.R1.fastq.gz
+			if [ -e $Sra_File.ascp.R1.err ]; then
+				rm $Sra_File.ascp.R1.err >/dev/null 2>&1
+			fi
+		fi
+
+	else
+		echo "($SDUCsub)Warnings: existing R1.fastq file found: $Sra_File"
+	fi
+	# Create the full path to the file.
+	local Sra_File="$opt_d/$SDUCsrr.R2.fastq.gz"
+	if [ ! -f $Sra_File ]; then
+		URL="era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/${PATH1}/${PATH2}/${SDUCsrr}_2.fastq.gz"
+		echo "($SDUCsub)Info: Downloading: $URL"
+		echo "($SDUCsub)Info: Saving to: $Sra_File"
+		ascp $opt_n $URL $opt_d > $Sra_File.ascp.R2.log 2>&1
+		if [ $? -ne 0 ]; then
+			echo "($SDUCsub)Error: ascp failed to download R2: $SDUCsrr" >&2
+			echo "($SDUCsub)Error: CMD used: ascp $opt_n $URL $opt_d" >&2
+			return 100;
+		else # Move to local file only if successful.
+			mv ${SDUCsrr}_2.fastq.gz ${SDUCsrr}.R2.fastq.gz
+			if [ -e $Sra_File.ascp.R2.log ]; then
+				rm $Sra_File.ascp.R2.log >/dev/null 2>&1
 			fi
 		fi
 	else
-		echo "($SDUCsub)Warnings: existing SRA file found: $Sra_File"
+		echo "($SDUCsub)Warnings: existing R2.fastq file found: $Sra_File"
 	fi
 
 	return 0
+	
 }
 ###ascp的用法：ascp [参数] 目标文件 目标地址，在线文档
 #-v verbose mode 唠叨模式，能让你实时知道程序在干啥，方便查错。有些作者的程序缺乏人性化，运行之后，只见光标闪，压根不知道运行到哪了
@@ -161,12 +183,12 @@ SrrDownloadUsingAscp() {
 #-Q 不懂，一般加上它
 #-P 提供SSH port，一般是33001，反正我不懂
 
-### SRA数据库下载
-#首先记住，数据的存放地址是ftp-private.ncbi.nlm.nih.gov，SRA在Aspera的用户名是anonftp，下载举例：
-#如果我想下载SRR949627.sra文件，首先我需要找到地址，去ncbi ftp-private或者ncbi faspftp，一层层寻找，直至找到，然后记下链接地址，就可以开始下载了：
-#ascp -v -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh -k 1 -T -l200m anonftp@ftp-private.ncbi.nlm.nih.gov:/sra/sra-instant/reads/ByRun/sra/SRR/SRR949/SRR949627/SRR949627.sra ~/biostar/aspera/
-#    注意：anonftp@ftp-private.ncbi.nlm.nih.gov后面是:号，不是路径/！
-#    一般来说，NCBI的sra文件前面的地址都是一样的/sra/sra-instant/reads/ByRun/sra/SRR/...，那么写脚本批量下载也就不难了！
+### ENA数据库下载：这里和上面不同，数据的存放地址是fasp.sra.ebi.ac.uk，ENA在Aspera的用户名是era-fasp，下载举例：
+### 同样，我还是下载SRR949627，方便的是ENA中可以直接下载fastq.gz文件，不用再从sra文件慢吞吞的转换了，那么地址呢，可以去ENA搜索，再复制下fastq.gz文件的地址，或者可以去ENA的ftp地址ftp.sra.ebi.ac.uk搜索，注意，是ftp，不是fasp！记下链接地址，就可以下载了：
+### ascp -QT -l 300m -P33001 -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh era-fasp@fasp.sra.ebi.ac.uk:/vol1/fastq/SRR949/SRR949627/SRR949627_1.fastq.gz ~/biostar/aspera/
+###    注意：era-fasp@fasp.sra.ebi.ac.uk后面是:号，不是路径/！
+###    一般来说，EBI的sra文件前面的地址也都是一样的vol1/fastq/...，那么写脚本批量下载也就不难了！
+
 
 
 
