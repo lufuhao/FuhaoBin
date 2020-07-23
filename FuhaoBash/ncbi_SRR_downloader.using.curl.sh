@@ -155,11 +155,6 @@ if [ $? -ne 0 ]; then
 	echo "Error: CMD 'curl' in PROGRAM 'curl' is required but not found.  Aborting..." >&2 
 	exit 127
 fi
-CmdExists 'fastq-dump'
-if [ $? -ne 0 ]; then
-	echo "Error: CMD 'fastq-dump' in PROGRAM 'SRAtools' is required but not found.  Aborting..." >&2 
-	exit 127
-fi
 
 
 
