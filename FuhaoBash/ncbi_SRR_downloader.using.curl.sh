@@ -93,7 +93,7 @@ while [ -n "$1" ]; do
   case "$1" in
     -h) help;shift 1;;
     -i) SRRlist=($(echo $2 | tr "," "\n"));shift 2;;
-    -f) opt_f=$2;shift 2;;
+    -f) opt_f=$(readlink -f $2);shift 2;;
     -d) opt_d=$2;shift 2;;
     --) shift;break;;
     -*) echo "error: no such option $1. -h for help" > /dev/stderr;exit 1;;
@@ -177,10 +177,8 @@ fi
 
 #################### Main ###########################################
 
-
+cd $opt_d
 if [ ! -z "$opt_f" ] && [ -s "$opt_f" ]; then
-	opt_f=$(readlink -f $opt_f)
-	cd $opt_d
 	echo ""
 	echo "### Using SRR list file: $opt_f"
 	echo ""
@@ -195,7 +193,6 @@ if [ ! -z "$opt_f" ] && [ -s "$opt_f" ]; then
 fi
 
 if [[ ${SRRlist[@]} -gt 0 ]]; then
-	cd $opt_d
 	echo ""
 	echo "### Using SRR comma list"
 	echo ""
