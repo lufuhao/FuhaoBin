@@ -1,0 +1,29 @@
+#!/usr/bin/Rscript
+
+#https://mp.weixin.qq.com/s?__biz=MzI3NzQ3MTcxMg==&mid=2247484646&idx=1&sn=9ac1ae24d9c48f9ce528ff6696ffa68d&chksm=eb648c69dc13057fbf4bad15f1c275915246fc51bd1bc86265bdaa403ba56064456197a55300&scene=126&sessionid=1595246119&key=221452a4d6b5ef37e42787d7f294552f23d1d60521be4206746f659a4949ad6baad7f7bcb222c694e204ff656494eed8ac34c1a7894183e336d120fc7fa4540270e946f4499cefa93b109071d2eb34d3&ascene=1&uin=MTEyOTU0NzU1NA%3D%3D&devicetype=Windows+10+x64&version=62090529&lang=zh_CN&exportkey=AqqTvw%2ByIeNxLSvOcucIAgo%3D&pass_ticket=eG7T8oZwGnQKcs%2Bt5lOP6veP4WCK1RUBC%2FVk4EXGZBaoC2lxswELlZFvYKdHj3gI
+
+DEGs<-read.csv("volcano_plot_example_data.csv",header=T,stringsAsFactors = F)
+dim(DEGs)
+df<-DEGs[-log10(DEGs$padj)>25,]
+dim(df)
+library(ggplot2)
+library(ggrepel)
+ggplot(DEGs,aes(x=log2FoldChange,y=-log10(padj)))+
+  geom_point(aes(color=change),size=2.5,alpha=1,na.rm = T)+
+  geom_hline(yintercept =-log10(0.05),color="#990000",
+             linetype="dashed")+
+  geom_vline(xintercept = -2,color="#990000",linetype="dashed")+
+  geom_vline(xintercept = 2,color="#990000",linetype="dashed")+
+  theme_bw(base_size = 14)+
+  scale_color_manual(values=c("red","#00B2FF","orange"))+
+  xlab(expression(log[2]("FoldChange")))+
+  ylab(expression(-log[10]("padj")))+
+  theme(legend.title = element_blank())+
+  ggtitle(label = "Volcano Plot", 
+          subtitle = "Colored by fold-change direction")+
+  geom_label_repel(data=df,aes(x=log2FoldChange,
+                          y=-log10(padj),
+                          label=name,fill=change),
+                   color="white",size=5)+
+  scale_fill_manual(values=c("red","orange"))+
+  guides(fill=F)
