@@ -121,6 +121,7 @@ SrrDownloadUsingCurl() {
 	
 	echo "($SDUCsub)Info: Getting SRR run: $SDUCsrr"
 
+	cd $opt_d
 	# Download only if it does not exist.
 	if [ ! -f $Sra_File ]; then
 		PATH1=${SDUCsrr:0:6}
@@ -145,7 +146,6 @@ SrrDownloadUsingCurl() {
 	return 0
 	
 }
-
 
 
 
@@ -176,7 +176,11 @@ fi
 
 
 #################### Main ###########################################
+
+
 if [ ! -z "$opt_f" ] && [ -s "$opt_f" ]; then
+	opt_f=$(readlink -f $opt_f)
+	cd $opt_d
 	echo ""
 	echo "### Using SRR list file: $opt_f"
 	echo ""
@@ -191,6 +195,7 @@ if [ ! -z "$opt_f" ] && [ -s "$opt_f" ]; then
 fi
 
 if [[ ${SRRlist[@]} -gt 0 ]]; then
+	cd $opt_d
 	echo ""
 	echo "### Using SRR comma list"
 	echo ""
