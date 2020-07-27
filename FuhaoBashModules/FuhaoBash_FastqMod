@@ -194,14 +194,23 @@ RunTrimmomatic () {
 	echo "${RMsubinfo}Info: Min Qual        : $RMmin_qual"
 	echo "${RMsubinfo}Info: Min Length      : $RMmin_len"
 	
-	
-	java -jar $RMpath_trimmomatic PE -threads $RMnumthreads -phred33 \
-	-trimlog $RMoutlog \
-	$RMr1 \
-	$RMr2 \
-	$RMoutfq1_paired $RMoutfq1_unpaired \
-	$RMoutfq2_paired $RMoutfq2_unpaired \
-	ILLUMINACLIP:"$RMfile_adaptor":2:30:10 LEADING:$RMmin_qual TRAILING:$RMmin_qual SLIDINGWINDOW:4:$RMmin_qual MINLEN:$RMmin_len
+	if [ -s $RMpath_trimmomatic ]; then
+		java -jar $RMpath_trimmomatic PE -threads $RMnumthreads -phred33 \
+		-trimlog $RMoutlog \
+		$RMr1 \
+		$RMr2 \
+		$RMoutfq1_paired $RMoutfq1_unpaired \
+		$RMoutfq2_paired $RMoutfq2_unpaired \
+		ILLUMINACLIP:"$RMfile_adaptor":2:30:10 LEADING:$RMmin_qual TRAILING:$RMmin_qual SLIDINGWINDOW:4:$RMmin_qual MINLEN:$RMmin_len
+	else
+		java org.usadellab.trimmomatic.TrimmomaticPE -threads $RMnumthreads -phred33 \
+		-trimlog $RMoutlog \
+		$RMr1 \
+		$RMr2 \
+		$RMoutfq1_paired $RMoutfq1_unpaired \
+		$RMoutfq2_paired $RMoutfq2_unpaired \
+		ILLUMINACLIP:"$RMfile_adaptor":2:30:10 LEADING:$RMmin_qual TRAILING:$RMmin_qual SLIDINGWINDOW:4:$RMmin_qual MINLEN:$RMmin_len
+	fi
 
 	if [ -s $RMoutfq1_paired ]; then
 		if [ ! -d $RMpathdir1/group ]; then

@@ -1,0 +1,29 @@
+#!/usr/bin/Rscript
+#https://mp.weixin.qq.com/s?__biz=MzI3NzQ3MTcxMg==&mid=2247484665&idx=1&sn=1a7e04daa9ba7adaa6ddb1d6f3887737&chksm=eb648c76dc1305603b042e5d2ffdbb83574ae1cd494e5d4683e297586a3aa9b9a7468d0bd0e3&scene=126&sessionid=1595596282&key=221452a4d6b5ef379f33ee82710c49d4f891dbace9fdd0280ab747dff70f032d3deabf762a539a9bd7000ab745f50cd5d2c4c6955b16924a8a21df6694c85dbf5487b3335d444831cff7b4fa0fd79178&ascene=1&uin=MTEyOTU0NzU1NA%3D%3D&devicetype=Windows+10+x64&version=62090529&lang=zh_CN&exportkey=AtpZhLyPSe4NtvvxUvfFdFQ%3D&pass_ticket=S3l3IRs%2FU58hf6UMXewa7tile1NGiphSQj%2B5gzvQAdIRG4CMoA5P00fEKn1fhjQM
+#微信：小明的数据分析笔记本
+#折线图
+
+df<-read.csv("../../WHO-COVID-19-global-data.csv",header=T, stringsAsFactors = F)
+head(df)
+df1<-df[df$Country_code=="US"|df$Country_code=="IN",]
+head(df1)
+table(df1$Country_code)
+table(df1$Country)
+library(ggplot2)
+df2<-na.omit(df1)
+x_labels<-paste("2020-0",1:7,"-11",sep="")
+x_labels
+ggplot(df2,aes(x=Date_reported,y=New_cases,group=Country_code))+
+  geom_point(aes(color=Country_code))+
+  geom_line(aes(color=Country_code))+
+  scale_x_discrete(breaks=x_labels,
+                   labels=x_labels)+
+  theme_bw()+
+  ggtitle("美国和印度每日新增确诊人数")+
+  theme(legend.title = element_blank(),
+        legend.position = "top",
+        plot.title = element_text(hjust=0.5))+
+  labs(x="",y="")+
+  scale_color_manual(values=c("red","blue"))+
+  scale_y_continuous(breaks=c(0,20000,40000,60000),
+                     labels = c("0","2万","4万","6万"))

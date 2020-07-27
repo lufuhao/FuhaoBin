@@ -1,0 +1,39 @@
+#!/usr/bin/Rscript
+
+#https://mp.weixin.qq.com/s?__biz=MzI1Njk4ODE0MQ==&mid=2247487800&idx=1&sn=11a8d873cc0b31ed464f383ec2793a6d&chksm=ea1f17badd689eaceda5a0426f69f1ddc11b5bbb16993f1772ef2d047939247e81a7596358a3&scene=126&sessionid=1595596185&key=25e1725a9070fca26c44d852e9bb59f14e1769fa4ab6633be98eca9a0a6efdd15f2ca7aab995abb76c31b8869ff0c2058d1101580301839d068b36b224b1d9eabcae95d08a2c79bfc1daed17a780ce12&ascene=1&uin=MTEyOTU0NzU1NA%3D%3D&devicetype=Windows+10+x64&version=62090529&lang=zh_CN&exportkey=Atb%2BE6lT5urbPF4sAW1qQxA%3D&pass_ticket=S3l3IRs%2FU58hf6UMXewa7tile1NGiphSQj%2B5gzvQAdIRG4CMoA5P00fEKn1fhjQM
+#微信：单细胞天地
+#
+
+my36colors <-c('#E5D2DD','#53A85F','#F1BB72','#F3B1A0','#D6E7A3','#57C3F3','#476D87','#E95C59','#E59CC4','#AB3282','#23452F','#BD956A','#8C549C','#585658','#9FA3A8','#E0D4CA','#5F3D69','#C5DEBA','#58A4C3','#E4C755','#F7F398','#AA9A59','#E63863','#E39A35','#C1E6F3','#6778AE','#91D0BE',
+'#B53E2B','#712820','#DCC1DD','#CCE0F5','#CCC9E6','#625D9E','#68A180','#3A6963','#968175')
+
+library (Seurat)
+library (ggplot2)
+
+modify_vlnplot<-function(obj, feature, pt.size =0,plot.margin = unit(c(-0.75,0, -0.75,0),"cm"),...) {
+    p<- VlnPlot(obj, features = feature, pt.size = pt.size,...) +
+    xlab("") + ylab(feature) + ggtitle("") +
+    theme(legend.position ="none",
+    axis.text.x = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_line(),
+    axis.title.y = element_text(size = rel(1), angle =0, vjust =0.5),    plot.margin = plot.margin )
+    return(p)
+}
+
+
+
+## main function
+
+StackedVlnPlot<-function(obj, features,pt.size =0,plot.margin = unit(c(-0.75,0, -0.75,0),"cm"),...) {
+    plot_list<- purrr::map(features,function(x) modify_vlnplot(obj = obj,feature = x,...))
+    plot_list[[length(plot_list)]]<- plot_list[[length(plot_list)]] +
+    theme(axis.text.x=element_text(), axis.ticks.x = element_line())
+    p<- patchwork::wrap_plots(plotlist = plot_list, ncol =1)
+    return(p)
+}
+
+#这个StackedVlnPlot是对Seurat的VlnPlot方法的封装，使用方法同VlnPlot，输入数据是Seurat对象
+
+StackedVlnPlot(sdata, c('Retnlg','Pygl','Anxa1','Igf1r','Stfa2l1'), pt.size=0, cols=my36colors)
