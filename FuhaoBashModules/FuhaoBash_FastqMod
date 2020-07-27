@@ -235,4 +235,87 @@ RunTrimmomatic () {
 
 	return 0
 }
+### run trimmomatic using classpath
+RunTrimmomatic2 () {
+	local RMr1=$1
+	local RMr2=$2
+	local RMoutfq1_paired=$4
+	local RMoutfq2_paired=$5
+	local RMoutpfx=$6
+	local RMfile_adaptor=$3
+	local RMmin_qual=$7
+	local RMmin_len=$8
+	local RMnumthreads=$9
+	
+	local RMsubinfo="FuhaoBash_FastqMod(RunTrimmomatic2)"
+	local RMoutfq1_unpaired="$RMoutpfx.R1.unpaired.fq.gz"
+	local RMoutfq2_unpaired="$RMoutpfx.R2.unpaired.fq.gz"
+	local RMoutlog="$RMoutpfx.trimmomatic.log"
+	if [ -z "$RMmin_qual" ]; then
+		RMmin_qual=15
+	fi
+	if [ -z "$RMmin_len" ]; then
+		RMmin_len=70
+	fi
+	if [ -z "$RMnumthreads" ]; then
+		RMnumthreads=1
+	fi
+	local RMpathdir1=$(dirname $RMoutfq1_paired)
+	if [ ! -d $RMpathdir1 ]; then
+		mkdir -p $RMpathdir1
+	fi
+	local RMpathdir2=$(dirname $RMoutfq2_paired)
+	if [ ! -d $RMpathdir2 ]; then
+		mkdir -p $RMpathdir2
+	fi
+	local RMpathdir3=$(dirname $RMoutfq1_unpaired)
+	if [ ! -d $RMpathdir3 ]; then
+		mkdir -p $RMpathdir3
+	fi
+	local RMpathdir4=$(dirname $RMoutfq2_unpaired)
+	if [ ! -d $RMpathdir4 ]; then
+		mkdir -p $RMpathdir4
+	fi
+	local RMpathdir5=$(dirname $RMoutlog)
+	if [ ! -d $RMpathdir5 ]; then
+		mkdir -p $RMpathdir5
+	fi
+#Parameters
+	
+	echo "${RMsubinfo}Info: fastq R1        : $RMr1"
+	echo "${RMsubinfo}Info: fastq R2        : $RMr2"
+	echo "${RMsubinfo}Info: Adaptors        : $RMfile_adaptor"
+	echo "${RMsubinfo}Info: Min Qual        : $RMmin_qual"
+	echo "${RMsubinfo}Info: Min Length      : $RMmin_len"
+	
+	java org.usadellab.trimmomatic.TrimmomaticPE -threads $RMnumthreads -phred33 \
+	-	trimlog $RMoutlog \
+		$RMr1 \
+		$RMr2 \
+		$RMoutfq1_paired $RMoutfq1_unpaired \
+		$RMoutfq2_paired $RMoutfq2_unpaired \
+		ILLUMINACLIP:"$RMfile_adaptor":2:30:10 LEADING:$RMmin_qual TRAILING:$RMmin_qual SLIDINGWINDOW:4:$RMmin_qual MINLEN:$RMmin_len
 
+	if [ -s $RMoutfq1_paired ]; then
+		if [ ! -d $RMpathdir1/group ]; then
+			mkdir -p $RMpathdir1/group
+		fi
+		fastqc $RMoutfq1_paired -o $RMpathdir1/group -f fastq -t $RMnumthreads --noextract
+#		if [ ! -d $RMpathdir1/nogroup ]; then
+#			mkdir -p $RMpathdir1/nogroup
+#		fi
+#		fastqc $RMoutfq1_paired -o $RMpathdir1/nogroup -f fastq -t $RMnumthreads --noextract --nogroup
+	fi
+	if [ -s $RMoutfq2_paired ]; then
+		if [ ! -d $RMpathdir2/group ]; then
+			mkdir -p $RMpathdir2/group
+		fi
+		fastqc $RMoutfq2_paired -o $RMpathdir2/group -f fastq -t $RMnumthreads --noextract
+#		if [ ! -d $RMpathdir2/nogroup ]; then
+#			mkdir -p $RMpathdir2/nogroup
+#		fi
+#		fastqc $RMoutfq2_paired -o $RMpathdir2/nogroup -f fastq -t $RMnumthreads --noextract --nogroup
+	fi
+
+	return 0
+}
