@@ -1,0 +1,70 @@
+#!/usr/bin/env Rscript
+
+
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+# 
+if(! require("optparse")) install.packages("optparse")
+library(optparse)
+if(! require("LinkageMapView")) install.packages("LinkageMapView")
+library(LinkageMapView)
+
+
+################# Arguments #########################
+#注意，这个模块不用加上-h的flag，不然会报错
+option_list = list(
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", help="Input File with header(col1 Group, col2 Position, col3 Locus)[default= %default]", metavar="character"),
+    make_option(c("--unit"), type="integer", default="1000000", 
+              action = "store", help="Unit[default= 1 000 000]", metavar="character"),
+#    make_option(c("-b", "--bilv"), type="character", default="200", 
+#              action = "store", help="ratio[default= %default]", metavar="character"),
+#    make_option(c("--outtable"), type="character", default=NULL, 
+#              action = "store", help="Output Table name[default= %default]", metavar="character"),
+    make_option(c("--outpdf"), type="character", default=NULL, 
+              action = "store", help="Output PDF name[default= %default]", metavar="character")
+  );
+
+opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+
+#if (is.null(opt$f)){
+#	print_help(opt_parser)
+#	stop("Error: invalid input file", call.=FALSE)
+#}
+#if (is.null(opt$outtable)){opt$outtable=paste(opt$f,'.xls',sep='')}
+if (is.null(opt$outpdf)){opt$outpdf=paste(opt$f,'.pdf',sep='')}
+
+
+
+################# MAIN #########################
+#oat <- read.csv(opt$f)
+data(oat)
+$maxpos <- floor(max(oat$Position[oat$Group == "Mrg01" | oat$Group == "Mrg02"]))
+maxpos <- floor(max(oat$Position))
+maxpos
+at.axis <- seq(0, maxpos)
+axlab <- vector() 
+	for (lab in 0:maxpos) {
+		if (!lab %% 10) {
+			axlab <- c(axlab, lab)
+		}
+		else {
+			axlab <- c(axlab, NA)
+		}
+	}
+axlab
+outfile = file.path(opt$outpdf)
+lmv.linkage.plot(oat,outfile,mapthese=c("Mrg01","Mrg01"),denmap=TRUE, cex.axis = 1, at.axis = at.axis, labels.axis = axlab)

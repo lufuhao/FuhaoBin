@@ -1,0 +1,67 @@
+#!/usr/bin/env Rscript
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+#堆积柱形图（stacked barplot）展示密码子偏向性的RSCU值 
+#https://mp.weixin.qq.com/s?__biz=MzI3NzQ3MTcxMg==&mid=2247484705&idx=1&sn=d035611ff4458996dd8cd0204514c3a9&chksm=eb648daedc1304b8887f8a3c9ad2afd403605d1a021df126b07b2cf47b87c717bec1684acca5&scene=126&sessionid=1596416246&key=221452a4d6b5ef37a496b812549c79f2bab325c9c28779bb94bd5009f2721c2d40f32cfa8ed58ec13e399d203c314c21d6d795fc438af217dc28c6a8ac3c1872c2fd47ba449193d4832335335202d106&ascene=1&uin=MTEyOTU0NzU1NA%3D%3D&devicetype=Windows+10+x64&version=62090529&lang=zh_CN&exportkey=AhYlnL7zhxFYsXolvZGkSpw%3D&pass_ticket=BZH8wpKUj3f0pQVRaHxsVom05HgxCY%2FQhlPexfjINdnk1%2Fdm0K4gn3RqM5JVbuN8
+#小明的数据分析笔记本
+### Step1: calculate RSCU using python CAI
+#rscu_calculator_by_CAI.py
+### Step2: RSCU stacked barplot using ggplot2
+#rscu_ctacked_barploy.by.ggplot2.Rscript
+
+is.installed <- function(mypkg) is.element(mypkg, installed.packages()[,1]) 
+
+
+################# Requirements #########################
+# optparse
+# ggplot2
+
+if(! require("aplot")) install.packages("aplot")
+if(! require("aplot")) install.packages("aplot")
+library('aplot')
+library(ggplot2)
+
+#注意，这个模块不用加上-h的flag，不然会报错
+option_list = list(
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", help="Input File[default= %default]", metavar="character"),
+    make_option(c("--title"), type="character", default="bar", 
+              action = "store", help="Title[default= %default]", metavar="character"),
+    make_option(c("-b", "--bilv"), type="character", default="200", 
+              action = "store", help="ratio[default= %default]", metavar="character"),
+    make_option(c("--outtable"), type="character", default=NULL, 
+              action = "store", help="Output Table name[default= %default]", metavar="character"),
+    make_option(c("--outpdf"), type="character", default=NULL, 
+              action = "store", help="Output PDF name[default= %default]", metavar="character")
+  );
+
+opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+
+if (is.null(opt$f)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+if (is.null(opt$outtable)){opt$outtable=paste(opt$f,'.xls',sep='')}
+if (is.null(opt$outpdf)){opt$outpdf=paste(opt$f,'.pdf',sep='')}
+
+
+
+df<-read.csv('rscu.txt',header=F,stringsAsFactors = F)
+p1<-ggplot(df,aes(fill=as.character(V4),x=V2,y=V3))+geom_bar(position = "stack",stat="identity")+theme_bw()+scale_y_continuous(expand=c(0,0), limits = c(0,6.2))+ theme(legend.position = "none")+labs(y="RSCU",x="")
+#geom_text(aes(label=V1),position=position_stack(vjust=0.5))
+p1
+p2<-ggplot(df,aes(x=V2,y=V4))+
+  geom_label(aes(label=V1,fill=as.character(V4)), size=2)+
+  labs(x="",y="")+ylim(3.4,6.1)+
+  theme_minimal()+
+  theme(legend.position = "none", axis.text = element_blank(), axis.ticks = element_blank(), panel.grid = element_blank())
+p1%>%
+  insert_bottom(p2,height = 0.3)
