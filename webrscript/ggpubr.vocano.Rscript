@@ -1,0 +1,157 @@
+#!/usr/bin/env Rscript
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+x_title="logFC"
+y_title="logP"
+x_label="log2FoldChange")
+y_label="-log10(Adjusted P-value)"
+#color_palette=c("blue", "grey", "red")
+color_palette=c("#2f5688", "#BBBBBB", "#CC0000")
+dot_size=1
+font_label=8
+
+
+
+
+
+is.installed <- function(mypkg) is.element(mypkg, installed.packages()[,1]) 
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+if(! require("optparse")) install.packages("optparse")
+library(optparse)
+if(! require("qqpubr")) install.packages("qqpubr")
+library(qqpubr)
+if(! require("ggthemes")) install.packages("ggthemes")
+library(ggthemes)
+
+
+
+#注意，这个模块不用加上-h的flag，不然会报错
+option_list = list(
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", help="Input File[default= %default]", metavar="character"),
+    make_option(c("-p", "--prefix"), type="character", default="MyOut", 
+              action = "store", help="Title[default= %default]", metavar="character"),
+    make_option(c("-b", "--bilv"), type="character", default="200", 
+              action = "store", help="ratio[default= %default]", metavar="character"),
+    make_option("--debug"), type="logical", default=FALSE, 
+              action = "store", help="debug mode"),
+    make_option(c("--svg"), type="logical", default=TRUE, 
+              action = "store", help="Output SVG [default= %default]", metavar="character"),
+    make_option(c("--pdf"), type="logical", default=FALSE, 
+              action = "store", help="Output TIFF [default= %default]", metavar="character")
+    make_option(c("--tif"), type="logical", default=FALSE, 
+              action = "store", help="Output TIFF [default= %default]", metavar="character")
+    make_option(c("--eps"), type="logical", default=FALSE, 
+              action = "store", help="Output EPS [default= %default]", metavar="character"),
+  );
+
+opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+
+if (is.null(opt$f)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+if (is.null(opt$outtable)){opt$outtable=paste(opt$f,'.xls',sep='')}
+if (is.null(opt$outpdf)){opt$outpdf=paste(opt$f,'.pdf',sep='')}
+
+# read data
+deg.data <- read.table(opt$f, header=T, sep="\t")
+# list first 6 lines
+head(deg.data)
+#	Symbol	logFC	AveExpr	t	P.Value	adj.P.Val	B
+#1	LTB	2.58	11.65	13.07	1.17e-14	1.65e-10	23.16
+#2	CDCA5	-2.32	12.32	-11.70	2.45e-13	1.15e-09	20.27
+#3	C10orf54	3.30	10.13	11.54	3.53e-13	1.24e-09	19.93
+#4	CAPN	2.51	9.70	11.08	1.04e-12	2.66e-09	18.89
+#5	OIP5	-2.16	11.49	-10.95	1.43e-12	3.36e-09	18.59
+#6	SNORD116-2	3.13	8.85	10.78	2.15e-12	3.37e-09	18.20
+
+#log10 transform to DEG adjusted p value adj.P.Val
+deg.data$logP <- -log10(deg.data$adj.P.Val)
+
+#draw volcao plot
+if (opt$debug) {
+	ggscatter(deg.data, x = x_title, y=y_title) + theme_base()
+}
+
+# add a new column Group
+deg.data$Group= "not-significant"
+# define sig-up regulated genes: adj.P.Val<=0.05 and logFC>=2
+# define sig-down regulated genes: adj.P.Val<=0.05 and logFC<=-2
+deg.data$Group[which((deg.data$adj.P.Val<=0.05) & (deg.data$logFC>=2))] = "up-regulated"
+deg.data$Group[which((deg.data$adj.P.Val<=0.05) & (deg.data$logFC<=-2))] = "down-regulated"
+
+#draw volcao plot
+if (opt$debug) {
+	ggscatter(deg.data, x = x_title, y=y_title, color="Group") + theme_base()
+fi
+
+# dot size and volcano color
+if (opt$debug) {
+	ggscatter(deg.data, x = x_title, y=y_title, color="Group", palette=color_palette, size=dot_size) + theme_base()
+fi
+
+# add logP and logFC bordline
+if (opt$debug) {
+    ggscatter(deg.data, x = x_title, y=y_title, color="Group", 
+          palette=color_palette, size=dot_size) + theme_base() + 
+          geom_hline(yintercept=1.30, linetype="dashed") +
+          geom_hline(xintercept=c(-2,2), linetype="dashed")
+}
+
+# add label
+deg.data$Label=""
+#sort by P value
+deg.data<-deg.data[order(deg.data$adj.P.Val),]
+#seleted N genes from up-regulated genes
+up.genes<-head(deg.data$Symbol[which(deg.data$Group == "up-regulated")], 10)
+#seleted N genes from down-regulated genes
+down.genes<-head(deg.data$Symbol[which(deg.data$Group == "down-regulated")], 10)
+#merge up.genes and down.genes to Label
+deg.top10.genes <- c(as.character(up.genes), as.character(down.genes))
+deg.data$Label[match(deg.tio10.genes, deg.data$Symbol)] <- deg.top10.genes
+
+My.Plot <- ggscatter(deg.data, x = x_title, y=y_title, color="Group", 
+          palette=color_palette, size=dot_size, label=deg.data$Label, 
+          font.label=font_label, repel=T, xlab=x_label, ylab=y_label) + theme_base() + 
+          geom_hline(yintercept=1.30, linetype="dashed") +
+          geom_hline(xintercept=c(-2,2), linetype="dashed")
+
+if (opt$svg) {
+	svg(filename=paste(opt$p, ".svg", sep=""), width=5, height=4, pointsize=12)
+	My.Plot
+	dev.off()
+}
+if (opt$pdf) {
+	pdf(file=paste(opt$p, ".pdf", sep=""))
+	My.Plot
+	dev.off()
+}
+if (opt$tif) {
+	tiff(filename = paste(opt$p, ".tif", sep=""), width = 8, height = 8, units = "cm", pointsize = 12, compression = "lzw", bg = "white", res = 600, family = "Arial")
+	My.Plot
+	dev.off()
+}
+if (opt$eps) {
+	setEPS()
+	postscript(paste(opt$p, ".eps", sep=""), width=1, height=1, pointsize=10)
+	My.Plot
+	dev.off()
+}
+
+
+

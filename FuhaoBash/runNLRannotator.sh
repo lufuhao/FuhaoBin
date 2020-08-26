@@ -3,6 +3,8 @@
 GenomeFa=$1
 OutPfx=$2
 
+
+
 if [ ! -s $GenomeFa ]; then
 	echo "Error: Genome File not found" >&2
 	exit 100
@@ -17,7 +19,7 @@ if [ ! -s $OutPfx.1.subseq.fa ]; then
 fi
 ### NLR-Parser
 if [ ! -s $OutPfx.2.subseq.fa.nlr.xml ]; then
-	java -jar $NLR_ANNOTATOR_HOME/NLR-Parser3.jar -t 1 -y /home/lufuhao/P5820T1D2T/Programs/meme/v5.1.1/x86_64/bin/mast -x $NLR_ANNOTATOR_HOME/meme.xml -i $OutPfx.1.subseq.fa -c $OutPfx.2.subseq.fa.nlr.xml
+	java -jar $NLR_ANNOTATOR_HOME/NLR-Parser3.jar -t 1 -y mast -x $NLR_ANNOTATOR_HOME/meme.xml -i $OutPfx.1.subseq.fa -c $OutPfx.2.subseq.fa.nlr.xml
 	if [ $? -ne 0 ] || [ ! -s $OutPfx.2.subseq.fa.nlr.xml ]; then
 		echo "Error: NLR-Parser.jar running error" >&2
 		exit 100
