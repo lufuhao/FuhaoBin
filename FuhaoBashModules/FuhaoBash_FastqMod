@@ -239,10 +239,10 @@ RunTrimmomatic () {
 RunTrimmomatic2 () {
 	local RMr1=$1
 	local RMr2=$2
-	local RMoutfq1_paired=$4
-	local RMoutfq2_paired=$5
-	local RMoutpfx=$6
-	local RMfile_adaptor=$3
+	local RMoutfq1_paired=$3
+	local RMoutfq2_paired=$4
+	local RMoutpfx=$5
+	local RMfile_adaptor=$6
 	local RMmin_qual=$7
 	local RMmin_len=$8
 	local RMnumthreads=$9
@@ -289,7 +289,7 @@ RunTrimmomatic2 () {
 	echo "${RMsubinfo}Info: Min Length      : $RMmin_len"
 	
 	java org.usadellab.trimmomatic.TrimmomaticPE -threads $RMnumthreads -phred33 \
-	-	trimlog $RMoutlog \
+		-trimlog $RMoutlog \
 		$RMr1 \
 		$RMr2 \
 		$RMoutfq1_paired $RMoutfq1_unpaired \
