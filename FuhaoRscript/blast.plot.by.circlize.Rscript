@@ -1,0 +1,156 @@
+#!/usr/bin/env Rscript
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+is.installed <- function(mypkg) is.element(mypkg, installed.packages()[,1]) 
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+if(! require("optparse")) install.packages("optparse")
+library(optparse)
+if(! require("circlize")) install.packages("circlize")
+library(circlize)
+if(! require("RColorBrewer")) install.packages("RColorBrewer")
+library(RColorBrewer)
+
+if(! require("ComplexHeatmap"))
+    if (!requireNamespace("BiocManager", quietly = TRUE))
+        install.packages("BiocManager")
+    library("BiocManager")
+    BiocManager::install("ComplexHeatmap")
+library(ComplexHeatmap)
+
+#注意，这个模块不用加上-h的flag，不然会报错
+option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= %default]", metavar="FILE),
+    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+              action = "store", dest=file, help="BLAST File[default= %default]", metavar="FILE"),
+    make_option(c("--seq01name"), type="double", default=NULL, 
+              action = "store", help="Seq 1 name [default= %default]", metavar="character"),
+    make_option(c("--seq01length"), type="double", default=NULL, 
+              action = "store", help="Seq 1 length [default= %default]", metavar="double"),
+    make_option(c("--seq02name"), type="double", default=NULL, 
+              action = "store", help="Seq 2 name [default= %default]", metavar="character"),
+    make_option(c("--seq01length"), type="double", default=NULL, 
+              action = "store", help="Seq 2 length [default= %default]", metavar="double"),
+    make_option(c("--startdegree"), type="double", default=130, 
+              action = "store", help="Start Degree [default= %default]", metavar="double"),
+    make_option(c("--eps"), type="logical", default=FALSE, 
+              action = "store", help="Output EPS [default= %default]", metavar="character"),
+    make_option(c("--svg"), type="logical", default=TRUE, 
+              action = "store", help="Output SVG [default= %default]", metavar="character"),
+    make_option(c("--tif"), type="logical", default=FALSE, 
+              action = "store", help="Output TIFF [default= %default]", metavar="character"),
+    make_option(c("--pdf"), type="logical", default=FALSE, 
+              action = "store", help="Output TIFF [default= %default]", metavar="character")
+  );
+
+opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is to display BLAST using circlize!
+
+makeblastdb -in mt.fasta -dbtype nucl -out mt
+
+blastn -query cp.fasta -db mt -outfmt 6 > output.txt
+
+
+"))
+
+
+
+if (is.null(opt$f)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+
+
+seq01_name <- opt$seq01name
+seq02_name <- opt$seq02length
+seq01_length <- opt$seq01length
+seq02_length <- opt$seq02length
+
+### 是准备数据用来画最外圈用来展示两条序列的部分
+df<-data.frame(chr=c(rep(seq01_name,2),rep(seq02_name,2)),
+               x=c(1,131478,1,444567),
+               y=c(0,1,0,1))
+df
+#            chr      x y
+#1   chloroplast      1 0
+#2   chloroplast 131478 1
+#3 mitochondrial      1 0
+#4 mitochondrial 444567 1
+
+### 读入blast的输出结果
+df1<-read.csv(opt$f,stringsAsFactors = F,header=F,sep="\t")
+
+
+### 作图
+col<-RColorBrewer::brewer.pal(6,"Paired")
+circos.par("start.degree" = opt$startdegree)
+circos.initialize(factors = df$chr,x=df$x)
+#调整用来表示染色体的外圈粗细track.height
+circos.trackPlotRegion(factors = df$chr,y=df$y,
+                       panel.fun = function(x,y){
+                         circos.axis()
+                       },track.height = 0.1)
+highlight.sector(sector.index = seq01_name,col=col[1])
+highlight.sector(sector.index = seq02_name,col=col[2])
+circos.text(x=70000,y=0.5,
+            labels = seq01_name,
+            sector.index = seq01_name)
+circos.text(x=220000,y=0.5,
+            labels = seq02_name,
+            sector.index = seq02_name,
+            facing = "outside")
+col_fun = colorRamp2(c(70,90,100),
+                     c("green", "yellow", "red"))
+for (i in 1:13){
+  x<-sort(c(df1[i,8],df1[i,7]))
+  y<-sort(c(df1[i,10],df1[i,9]))
+  z<-df1[i,3]
+  circos.link(seq01_name,x,seq02_name,y,
+              col=add_transparency(col_fun(z)))
+}
+circos.clear()
+lgd_links = Legend(at = c(70, 80, 90, 100), 
+                   col_fun = col_fun, 
+                   title_position = "topleft",
+                   title = "identity(%)")
+lgd_list_vertical = packLegend(lgd_links)
+
+My.Plot=draw(lgd_list_vertical, x = unit(10, "mm"), 
+     y = unit(10, "mm"), just = c("left", "bottom"))
+
+if (opt$svg) {
+	svg(filename=paste(opt$p, ".svg", sep=""), width=5, height=4, pointsize=12)
+	My.Plot
+	dev.off()
+}
+if (opt$pdf) {
+	pdf(file=paste(opt$p, ".pdf", sep=""))
+	My.Plot
+	dev.off()
+}
+if (opt$tif) {
+	tiff(filename = paste(opt$p, ".tif", sep=""), width = 8, height = 8, units = "cm", pointsize = 12, compression = "lzw", bg = "white", res = 600, family = "Arial")
+	My.Plot
+	dev.off()
+}
+if (opt$eps) {
+	setEPS()
+	postscript(paste(opt$p, ".eps", sep=""), width=1, height=1, pointsize=10)
+	My.Plot
+	dev.off()
+}
+

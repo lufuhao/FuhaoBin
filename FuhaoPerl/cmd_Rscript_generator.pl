@@ -93,22 +93,28 @@ if(! require("optparse")) install.packages("optparse")
 library(optparse)
 if(! require("LinkageMapView")) install.packages("LinkageMapView")
 library(LinkageMapView)
-
+if(! require("ComplexHeatmap"))
+    if (!requireNamespace("BiocManager", quietly = TRUE))
+        install.packages("BiocManager")
+    BiocManager::install("ComplexHeatmap")
+library(ComplexHeatmap)
 
 #注意，这个模块不用加上-h的flag，不然会报错
 option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= \%default]", metavar="character"),
     make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
               action = "store", dest=file, help="Input File[default= \%default]", metavar="character"),
     make_option(c("--title"), type="character", default="bar", 
               action = "store", help="Title[default= \%default]", metavar="character"),
-    make_option(c("-b", "--bilv"), type="character", default="200", 
+    make_option(c("-b", "--bilv"), type="logical/integer/double/complex/character", default="200", 
               action = "store", help="ratio[default= \%default]", metavar="character"),
     make_option(c("--eps"), type="logical", default=FALSE, 
               action = "store", help="Output EPS [default= \%default]", metavar="character"),
     make_option(c("--svg"), type="logical", default=TRUE, 
               action = "store", help="Output SVG [default= \%default]", metavar="character"),
     make_option(c("--tif"), type="logical", default=FALSE, 
-              action = "store", help="Output TIFF [default= \%default]", metavar="character")
+              action = "store", help="Output TIFF [default= \%default]", metavar="character"),
     make_option(c("--pdf"), type="logical", default=FALSE, 
               action = "store", help="Output TIFF [default= \%default]", metavar="character")
   );
@@ -147,7 +153,7 @@ if (is.null(opt\$outpdf)){opt\$outpdf=paste(opt\$f,'.pdf',sep='')}
 ### 10x6 cm
 pdf("plots.pdf", width=10/2.54, height=6/2.54)
 ###If you want to edit your file in a vector editor like Inkscape or Illustrator, some of the plotting point objects might look like letters instead of circles, squares, etc. To avoid this problem:
-#pdf(?plots.pdf?, useDingbats=FALSE)
+#pdf("plots.pdf", useDingbats=FALSE)
 
 ### PNG
 ### By default, the graphs are 480x480 pixels in size, at a resolution of 72 dpi (6.66x6.66 inches).
@@ -161,7 +167,7 @@ pdf("plots.pdf", width=10/2.54, height=6/2.54)
 
 
 ### SVG
-#svg(filename=?Std_SVG.svg?, width=5, height=4, pointsize=12)
+#svg(filename="Std_SVG.svg", width=5, height=4, pointsize=12)
 #dev.off()
 
 ### TIFF

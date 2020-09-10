@@ -1,0 +1,97 @@
+#!/usr/bin/env Rscript
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+is.installed <- function(mypkg) is.element(mypkg, installed.packages()[,1]) 
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+if(! require("optparse")) install.packages("optparse")
+library(optparse)
+if(! require("RIdeogram")) install.packages("RIdeogram")
+library(RIdeogram)
+
+
+#注意，这个模块不用加上-h的flag，不然会报错
+option_list = list(
+    make_option(c("-i", "--info"), type="character", default=NULL, 
+              action = "store", dest=file, help="Genome info File[default= %default]", metavar="character"),
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", dest=file, help="BLAST output File [default= %default]", metavar="character"),
+    make_option("--eps", type="logical", default=NULL, 
+              action = "store", help="Output EPS [default= %default]", metavar="logical"),
+    make_option("--svg", type="logical", default=NULL, 
+              action = "store", help="Output SVG [default= %default]", metavar="logical"),
+    make_option("--tif", type="logical", default=NULL, 
+              action = "store", help="Output TIFF [default= %default]", metavar="logical"),
+    make_option("--pdf", type="logical", default=NULL, 
+              action = "store", help="Output TIFF [default= %default]", metavar="logical")
+  );
+
+opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is  to display blast results!"))
+#parse_args(OptionParser(option_list=option_list, usage = "This Script is  to display blast results!"))
+
+###使用R语言包RIdeogram展示blast双序列比对结果
+
+### 基因组的基本信息 Genome info
+#  Chr Start      End   fill species size  color
+#1  I      1 23037639 969696   Grape   12 252525
+#2  II     1 18779884 969696   Grape   12 252525
+#3 III     1 19341862 969696   Grape   12 252525
+#4  IV     1 23867706 969696   Grape   12 252525
+#5   V     1 25021643 969696   Grape   12 252525
+#6  VI     1 21508407 0ab276   Grape   12 252525
+
+### 共线性分析的结果 Synteny
+#  Species_1  Start_1    End_1 Species_2 Start_2   End_2   fill
+#1         1 12226377 12267836         2 5900307 5827251 cccccc
+#2        15  5635667  5667377        17 4459512 4393226 cccccc
+#3         9  7916366  7945659         3 8618518 8486865 cccccc
+#4         2  8214553  8242202        18 5964233 6027199 cccccc
+#5        13  2330522  2356593        14 6224069 6138821 cccccc
+#6        11 10861038 10886821        10 8099058 8011502 cccccc
+
+#makeblastdb -in mt.fasta -dbtype nucl -out mt
+#blastn -query cp.fasta -db mt -outfmt 6 > output.txt
+
+#构造RIdeogram的输入数据：df1.txt文件内容
+#Chr,Start,End,fill,species,size,color
+#I,1,131478,FF9D1E,chloroplast,12,252525
+#I,1,444567,FF9D1E,mitochondrion,12,252525
+
+
+
+if (is.null(opt$i)){
+	print_help(opt_parser)
+	stop("Error: invalid Info file", call.=FALSE)
+}
+if (is.null(opt$f)){
+	print_help(opt_parser)
+	stop("Error: invalid BLAST file", call.=FALSE)
+}
+
+df1<-read.table(opt$i,stringsAsFactors = F)
+head(df1)
+df2<-read.table(opt$f,header=F,sep="\t",stringsAsFactors = F)
+df3<-df2[,c(3,7,8,9,10)]
+df3$fill<-ifelse(df3$V3>90,"0080cc",ifelse(df3$V3<80,"0ab276","e64e60"))
+df3$Species_1<-1
+df3$Species_2<-1
+head(df3)
+df4<-df3%>%select(Species_1,V7,V8,Species_2,V9,V10,fill)
+#colnames(df4)<-colnames(synteny_dual_comparison)
+colnames(df4)<-c("Chr", "Start", "End", "fill", "species", "size", "color")
+ideogram(karyotype =df1, synteny=df4,output = paste(opt$f, ".svg", sep=""))
+rsvg_pdf(paste(opt$f, ".svg", sep=""),paste(opt$f, ".pdf", sep=""))
