@@ -1,0 +1,39 @@
+#!/usr/bin/env python3
+
+### zip解压炸弹进行预防
+# -*- coding: utf-8 -*-
+# @微信号   : King_Uranus
+# @公众号    : 清风Python
+# @GitHub   : https://github.com/BreezePython
+# @Date     : 2020/09/08 23:30:33
+# @File     : zip_boom.py
+import zipfile
+import os
+
+def unzip(filename: str):
+    # 限制最大文件数100
+    max_file_num = 100
+    # 设置解压内容最大值(一般平均最大的压缩率20，再高就很可能是异常文件了！)
+    max_file_size = 1024 * 1024 * 100 * 20
+    total_size = 0
+    to_zip_file = zipfile.ZipFile(filename)
+    dirname = filename.replace('.zip', '')
+    # 校验文件总数量
+    if len(to_zip_file.filelist) > max_file_num:
+        raise ValueError("压缩文件的数量超过了上限")
+    # 校验解压文件内容最大值
+    for file in to_zip_file.filelist:
+        total_size += file.file_size
+        if total_size > max_file_size:
+            raise IOError("压缩包内容异常")
+    # 判断文件夹重复则退出
+    if os.path.exists(dirname):
+        print(f'{dirname} dir has already existed')
+        return -1
+    else:
+        # 创建文件夹，并解压
+        os.mkdir(dirname)
+        to_zip_file.extractall(dirname)
+        to_zip_file.close()
+
+unzip('zip_boom.zip')
