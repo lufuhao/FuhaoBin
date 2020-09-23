@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use strict;
 use warnings;
-use FuhaoPerl5Lib::MiscKit qw/ListMerger/;
+use FuhaoPerl5Lib::MiscKit qw/ListMergerMultiCols/;
 use constant USAGE =><<EOH;
 
 usage: $0 out.sum "undefined_value" in1 in2 ..
@@ -35,6 +35,6 @@ die USAGE if (scalar(@ARGV) <4 or $ARGV[0] eq '-h' or $ARGV[0] eq '--help');
 
 my $output=shift @ARGV;
 my $undef_mark=shift @ARGV;
-unless (ListMerger($output, $undef_mark, \@ARGV)) {
+unless (ListMergerMultiCols($output, $undef_mark, \@ARGV)) {
 	die "Error: ListMerger running";
 }
