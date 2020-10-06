@@ -27,9 +27,9 @@ library(RIdeogram)
 #注意，这个模块不用加上-h的flag，不然会报错
 option_list = list(
     make_option(c("-i", "--info"), type="character", default=NULL, 
-              action = "store", dest=file, help="Genome info File[default= %default]", metavar="character"),
+              action = "store", help="Genome info File[default= %default]", metavar="character"),
     make_option(c("-f", "--file"), type="character", default=NULL, 
-              action = "store", dest=file, help="BLAST output File [default= %default]", metavar="character"),
+              action = "store", help="BLAST output File [default= %default]", metavar="character"),
     make_option("--eps", type="logical", default=NULL, 
               action = "store", help="Output EPS [default= %default]", metavar="logical"),
     make_option("--svg", type="logical", default=NULL, 
@@ -40,8 +40,9 @@ option_list = list(
               action = "store", help="Output TIFF [default= %default]", metavar="logical")
   );
 
-opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is  to display blast results!"))
-#parse_args(OptionParser(option_list=option_list, usage = "This Script is  to display blast results!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!")
+opt = parse_args(opt_parser)
+
 
 ###使用R语言包RIdeogram展示blast双序列比对结果
 
