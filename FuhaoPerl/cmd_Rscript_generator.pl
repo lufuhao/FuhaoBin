@@ -103,23 +103,25 @@ library(ComplexHeatmap)
 option_list = list(
 #    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
 #              action = "store", dest=file, help="Input File[default= \%default]", metavar="character"),
-    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+    make_option(c("-f", "--file"), type="character", default=NULL, 
               action = "store", dest=file, help="Input File[default= \%default]", metavar="character"),
     make_option(c("--title"), type="character", default="bar", 
               action = "store", help="Title[default= \%default]", metavar="character"),
-    make_option(c("-b", "--bilv"), type="logical/integer/double/complex/character", default="200", 
+    make_option(c("-b", "--bilv"), type="double", default="200", 
               action = "store", help="ratio[default= \%default]", metavar="character"),
     make_option(c("--eps"), type="logical", default=FALSE, 
-              action = "store", help="Output EPS [default= \%default]", metavar="character"),
+              action = "store_true", help="Output EPS [default= \%default]", metavar="character"),
     make_option(c("--svg"), type="logical", default=TRUE, 
-              action = "store", help="Output SVG [default= \%default]", metavar="character"),
+              action = "store_true", help="Output SVG [default= \%default]", metavar="character"),
     make_option(c("--tif"), type="logical", default=FALSE, 
-              action = "store", help="Output TIFF [default= \%default]", metavar="character"),
+              action = "store_true", help="Output TIFF [default= \%default]", metavar="character"),
     make_option(c("--pdf"), type="logical", default=FALSE, 
-              action = "store", help="Output TIFF [default= \%default]", metavar="character")
+              action = "store_true", help="Output TIFF [default= \%default]", metavar="character")
   );
 
-opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+#opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!")
+opt = parse_args(opt_parser)
 
 if (is.null(opt\$f)){
 	print_help(opt_parser)
