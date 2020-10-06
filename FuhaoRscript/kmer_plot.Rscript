@@ -1,0 +1,85 @@
+#!/usr/bin/env Rscript
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+if(! require("optparse")) install.packages("optparse")
+library(optparse)
+
+#注意，这个模块不用加上-h的flag，不然会报错
+option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= %default]", metavar="character"),
+    make_option(c("-i", "--input"), type="character", default=NULL, 
+              action = "store", help="Two-column input kmer count file[default= %default]", metavar="character"),
+    make_option(c("-o", "--output"), type="character", default=NULL, 
+              action = "store", help="Output prefix[default= %default]", metavar="character"),
+    make_option(c("--eps"), type="logical", default=FALSE, 
+              action = "store_true", help="Output EPS [default= %default]", metavar="character"),
+    make_option(c("--svg"), type="logical", default=FALSE, 
+              action = "store_true", help="Output SVG [default= %default]", metavar="character"),
+    make_option(c("--tif"), type="logical", default=FALSE, 
+              action = "store_true", help="Output TIFF [default= %default]", metavar="character"),
+    make_option(c("--pdf"), type="logical", default=FALSE, 
+              action = "store_true", help="Output TIFF [default= %default]", metavar="character")
+  );
+
+#opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!")
+opt = parse_args(opt_parser)
+
+if (is.null(opt$i)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+if (is.null(opt$output)){opt$output=paste(opt$i,'.plot',sep='')}
+
+
+x <- read.table(opt$i, header = F, sep = "\t", stringsAsFactors = F)
+testOut=TRUE
+
+if (opt$svg) {
+	print ("### Info: ploting in SVG format")
+	svg(filename=paste(opt$output, ".svg", sep=""), width=5, height=4, pointsize=12)
+	plot(x, type = "l")
+	dev.off()
+	testOut=FALSE
+}
+
+if (opt$tif) {
+	print ("### Info: ploting in TIFF format")
+	tiff(filename = paste(opt$output, ".tif", sep=""), width = 8, height = 8, units = "cm", pointsize = 12, compression = "lzw", bg = "white", res = 600, family = "Arial")
+	plot(x, type = "l")
+	dev.off()
+	testOut=FALSE
+}
+if (opt$eps) {
+	print ("### Info: ploting in EPS format")
+	setEPS()
+	postscript(paste(opt$output, ".eps", sep=""), width=0.2, height=0.2, pointsize=10)
+	par(mar=c(1, 1, 1, 1))
+	plot(x, type = "l")
+	dev.off()
+	testOut=FALSE
+}
+if (opt$pdf || testOut) {
+	print ("### Info: ploting in PDF format")
+	pdf(file=paste(opt$output, ".pdf", sep=""))
+	plot(x, type = "l")
+	dev.off()
+}
+
+quit(save = "no", status = 0, runLast = FALSE)
+
