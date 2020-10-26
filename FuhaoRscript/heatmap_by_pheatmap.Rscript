@@ -1,0 +1,117 @@
+#!/usr/bin/env Rscript
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+is.installed <- function(mypkg) is.element(mypkg, installed.packages()[,1]) 
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+if(! require("optparse")) install.packages("optparse")
+library(optparse)
+if(! require("pheatmap")) install.packages("pheatmap")
+library("pheatmap")
+
+#注意，这个模块不用加上-h的flag，不然会报错
+option_list = list(
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", help="Input File[default= %default]", metavar="character"),
+    make_option(c("--eps"), type="logical", default=FALSE, 
+              action = "store_true", help="Output EPS [default= %default]", metavar="character"),
+    make_option(c("--svg"), type="logical", default=TRUE, 
+              action = "store_true", help="Output SVG [default= %default]", metavar="character"),
+    make_option(c("--tif"), type="logical", default=FALSE, 
+              action = "store_true", help="Output TIFF [default= %default]", metavar="character"),
+    make_option(c("--pdf"), type="logical", default=FALSE, 
+              action = "store_true", help="Output TIFF [default= %default]", metavar="character")
+  );
+
+#opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!")
+opt = parse_args(opt_parser)
+
+if (is.null(opt$f)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+
+
+
+# Reading data
+data <- read.table("expression.txt", header=T, row.names=1)
+# show first 6 lines
+head(data)
+
+###	M1	M2	M3	M4	M5	M6	M7	M8	M9	M10
+###GBP4 	6.59	5.22	3.69	3.93	4.52	9.30	8.98	7.65	8.66	7.41
+###BCAT1	5.76	4.89	5.44	3.48	3.85	8.66	8.79	8.76	8.09	8.26
+###CMPK2	9.56	4.54	3.99	5.61	3.90	9.79	7.13	7.37	7.93	6.15
+###STOX2	8.39	8.71	8.03	7.64	9.27	4.41	4.72	3.54	4.30	6.96
+###PADI2	8.41	8.26	8.45	9.20	5.59	4.59	5.36	4.13	4.91	4.08
+###SCARNA5	7.65	5.78	10.63	5.91	8.80	5.89	5.52	3.82	4.04	7.95
+
+
+# transform data to matrix format
+data <- as.matrix(data)
+
+### draw heatmap
+pheatmap(data)
+
+### 如果我们要修改热图的颜色，只需要使用color这个参数就可以啦。这里给大家推荐一个网址，https://www.bootcss.com/p/websafecolors/，里面有非常多的颜色可供选择。使用color颜色更改颜色变化尺之后的热图会更好看啦。我们可以参考文章中的绘图颜色，这样会让我们的热图更富有视觉效果。
+### color.key是我们构建的颜色变化尺，以后只需要修改color.key的内容，就可以轻松搞定各种色图颜色了。
+color.key <- c("#3300CC", "#3399FF", "white", "#FF3333", "#CC0000")
+pheatmap(data, color=colorRampPalette(color.key)(50), border_color=NA)
+
+### 在科研做图过程中，有时候我们并不需要对基因或者样本进行聚类，那么如何调整热图中的聚类树呢，在pheatmap函数中，cluster_row参数可以控制基因的聚类，cluster_col可以控制样本的聚类。比如将cluster_row设置为FALSE，那么基因就不会进行聚类运算了。
+pheatmap(data, cluster_row=FALSE, color=colorRampPalette(color.key)(50), border_color=NA)
+
+
+
+### 给样本添加标注信息
+### 分组信息（Group）：M1-M5为Case组，M6-M10为Control组
+### 用药信息（Dose）：M1-M5梯度分别为1-5,M6-M10梯度同样为1-5
+annotation_col = data.frame(Group=rep(c("Case", "Control"), c(5, 5)), Dose=c(1:5, 1:5))
+rownames(annotation_col)=colnames(data)
+
+###给基因添加标注信息
+###设定前30个基因属于Cancer通路，后20个基因属于Metabolism通路
+annotation_row=data.frame(Pathway=rep(c("Cancer", "Metabolism"), c(20,30)))
+rownames(annotation_row)=rownames(data)
+
+###设置annotation_col和annotation_row，分别对样本和基因添加附注
+#pheatmap(data, color=colorRampPalette(color.key)(50), border_color=NA, annotation_col=annotation_col, annotation_row=annotation_row)
+#pheatmap(data, color=colorRampPalette(color.key)(50), border_color=NA, annotation_col=annotation_col, annotation_row=annotation_row, fontsize = 20,fontface="italic",fontfamily= "Times New Roman")
+pheatmap(data, color=colorRampPalette(color.key)(50), border_color=NA, annotation_col=annotation_col, annotation_row=annotation_row, fontsize = 20, fontfamily= "Arial")
+
+if (opt$svg) {
+	svg(filename=paste(opt$p, ".svg", sep=""), width=5, height=4, pointsize=12)
+	pheatmap(data, color=colorRampPalette(color.key)(50), border_color=NA, annotation_col=annotation_col, annotation_row=annotation_row, fontsize = 20, fontfamily= "Arial")
+	dev.off()
+}
+if (opt$pdf) {
+	pdf(file=paste(opt$p, ".pdf", sep=""))
+	pheatmap(data, color=colorRampPalette(color.key)(50), border_color=NA, annotation_col=annotation_col, annotation_row=annotation_row, fontsize = 20, fontfamily= "Arial")
+	dev.off()
+}
+if (opt$tif) {
+	tiff(filename = paste(opt$p, ".tif", sep=""), width = 8, height = 8, units = "cm", pointsize = 12, compression = "lzw", bg = "white", res = 600, family = "Arial")
+	pheatmap(data, color=colorRampPalette(color.key)(50), border_color=NA, annotation_col=annotation_col, annotation_row=annotation_row, fontsize = 20, fontfamily= "Arial")
+	dev.off()
+}
+if (opt$eps) {
+	setEPS()
+	postscript(paste(opt$p, ".eps", sep=""), width=1, height=1, pointsize=10)
+	pheatmap(data, color=colorRampPalette(color.key)(50), border_color=NA, annotation_col=annotation_col, annotation_row=annotation_row, fontsize = 20, fontfamily= "Arial")
+	dev.off()
+}
