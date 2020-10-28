@@ -37,7 +37,7 @@ option_list = list(
   );
 
 #opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
-opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to plot kmer histogram, sep=tab!
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to plot kmer histogram and estimate genome size!
 jellyfish count -s 1G -m 21 -t 4 -o kmer -C SRRxxxxxx.fastq
 jellyfish dump -c -t kmer > kmer21.txt
 awk '{print $2}' kmer21.txt | sort -n | uniq -c | awk '{print $2 \"\\t\" $1}' > kmer21.1.histogram
