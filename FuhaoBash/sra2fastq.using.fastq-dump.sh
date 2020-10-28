@@ -82,14 +82,14 @@ echo -e "\n######################\nProgram $ProgramName initializing ...\n######
 #################### Initializing ###################################
 opt_d=$PWD
 declare -a SraArr=()
-opt_n=' --gzip --split-3 '
+opt_n=' --gzip --split-e '
 #################### Parameters #####################################
 while [ -n "$1" ]; do
   case "$1" in
     -h) help;shift 1;;
     -i) SraArr=($(echo $2 | tr ',' "\n"));shift 2;;
     -d) opt_d=$2;shift 2;;
-    -n) opt_n=1;shift 2;;
+    -n) opt_n=$2;shift 2;;
     --) shift;break;;
     -*) echo "error: no such option $1. -h for help" > /dev/stderr;exit 1;;
     *) break;;
