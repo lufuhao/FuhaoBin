@@ -1,0 +1,6 @@
+#!/bin/bash
+export PROGPATH=/home/hpcsoft/ProdSoft
+export PATH=$PROGPATH/bin:$PROGPATH/libraries/bin:/home/hpcsoft/TestSoft/bin:/home/hpcsoft/TestSoft/libraries/bin:$PATH
+export FUHAOLAB_ROOT=/home/hpcsoft/TestSoft/FuhaoLab
+export PATH=$FUHAOLAB_ROOT/bin:$PATH
+InstallPlatform='HPC'
