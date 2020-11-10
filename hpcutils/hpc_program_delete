@@ -2,7 +2,7 @@
 
 debug_mode=0
 is_empty_dir(){ 
-    return `ls -A $1|wc -w`
+	return `ls -A $1|wc -w`
 }
 DeleteEmptyDir() {
 	local -a dirArr=("$@")
@@ -24,7 +24,7 @@ listFolders(){
 }
 
 
-while read -p "Please select 1. ProdSoft 2. TestSoft 0 Exit, [1/2/0]: " progType; do
+while read -p "Please select 1. ProdSoft 2. TestSoft 3. \$PROGPATH 4. Custom 0. Exit, [1/2/3/4/0]: " progType; do
 	progPath=${PROGPATH}
 	if [ $progType -eq 0 ]; then
 		exit 0
@@ -32,8 +32,13 @@ while read -p "Please select 1. ProdSoft 2. TestSoft 0 Exit, [1/2/0]: " progType
 		progPath=/home/hpcsoft/ProdSoft
 	elif [ $progType -eq 2 ]; then
 		progPath=/home/hpcsoft/TestSoft
+	elif [ $progType -eq 3 ]; then
+		progPath=$PROGPATH
+	elif [ $progType -eq 4 ]; then
+		progPath=$PROGPATH
+		read -p "Please give a path [$PROGPATH]: " progPath
 	fi
-	echo "### Program Path selected: $progType"
+	echo "### Program Path selected: $progType.$progPath"
 	
 	echo -e "\n"
 	read -p "Please write Program Name: " progName
@@ -43,7 +48,7 @@ while read -p "Please select 1. ProdSoft 2. TestSoft 0 Exit, [1/2/0]: " progType
 	elif [ -d $progPath/$progName ]; then
 		echo "### Program Name valid: $progName"
 	elif [ -d $progPath/libraries/$progName ]; then
-                echo "### Libraries Program Name valid: $progName"
+		echo "### Libraries Program Name valid: $progName"
 		progPath="$progPath/libraries"
 	else
 		echo "Error: Program Name invalid: $progName; Please try again" >&2
@@ -55,10 +60,10 @@ while read -p "Please select 1. ProdSoft 2. TestSoft 0 Exit, [1/2/0]: " progType
 
 	echo -e "\n"
 	echo "Info: availble versions:"
-        listFolders $progPath/$progName
+		listFolders $progPath/$progName
 	read -p "Please write Program Version: " progVers
 	if [ -d $progPath/$progName/$progVers ]; then
-                echo "### Program Version valid: $progVers"
+		echo "### Program Version valid: $progVers"
 		if [ -z "$progVers" ]; then
 			rm -rf $progPath/$progName
 			if [ -e $progPath/bin/$progName ]; then
@@ -74,22 +79,21 @@ while read -p "Please select 1. ProdSoft 2. TestSoft 0 Exit, [1/2/0]: " progType
 		else
 			rm -rf $progPath/$progName/$progVers
 			if [ -e $progPath/bin/$progName-$progVers ]; then
-                                rm $progPath/bin/$progName-$progVers
+				rm $progPath/bin/$progName-$progVers
 			else
 				echo "Warnings: NOT found in bin: $progName-$progVers" >&2
-                        fi
-                        if [ -e $progPath/bin/modules/$progName/$progVers ]; then
-                                rm $progPath/bin/modules/$progName/$progVers
+			fi
+			if [ -e $progPath/bin/modules/$progName/$progVers ]; then
+				rm $progPath/bin/modules/$progName/$progVers
 				DeleteEmptyDir $progPath/bin/modules/$progName
 			else
 				echo "Warnings: NOT found in modules: $progName/$progVers" >&2
-                        fi
+			fi
 		fi
-        else
-                echo "### Program Version invalid: $progVers; Please try again" >&2
-                exit 100
-        fi
+	else
+		echo "### Program Version invalid: $progVers; Please try again" >&2
+		exit 100
+	fi
 	
 	DeleteEmptyDir $progPath/$progName
-
 done
