@@ -56,7 +56,7 @@ Options: fastq-dump options
   -i    SRA file, comma delimited
   -d    Ouput Path
   -n    Fastq-dump options
-          Defaults: --gzip --split-3
+          Defaults: --gzip --split-e
 
 Example:
   $0 -i SRR000000.sra,SRR111111.sra
@@ -131,10 +131,10 @@ fi
 #################### Main ###########################################
 
 for ind_sra in ${SraArr[@]}; do
-	fastq-dump $opt_n --defline-qual '+' --defline-seq '@\$ac-\$si/\$ri' --outdir $opt_d $ind_sra
+	fastq-dump $opt_n --defline-qual '+' --defline-seq '@$ac-$si/$ri' --outdir $opt_d $ind_sra
 	if [ $? -ne 0 ]; then
 		echo "Error: fastq-dump running error" >&2
-		echo "CMD used: fastq-dump $opt_n --defline-qual '+' --defline-seq '@\$ac-\$si/\$ri' --outdir $opt_d $ind_sra" >&2
+		echo "CMD used: fastq-dump $opt_n --defline-qual '+' --defline-seq '@$ac-$si[/$ri]' --outdir $opt_d $ind_sra" >&2
 		exit 100;
 	fi
 done
