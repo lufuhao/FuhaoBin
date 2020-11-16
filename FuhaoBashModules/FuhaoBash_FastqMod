@@ -319,3 +319,89 @@ RunTrimmomatic2 () {
 
 	return 0
 }
+
+
+
+### run trimmomatic using classpath
+RunFastp () {
+	local RFr1=$1
+	local RFr2=$2
+	local RFoutfq1_paired=$3
+	local RFoutfq2_paired=$4
+	local RFoutpfx=$5
+	local RFmin_qual=$6
+	local RFmin_len=$7
+	local RFnumthreads=$8
+	local RFoptions=$9
+	
+	local RFsubinfo="FuhaoBash_FastqMod(RunFastp)"
+	local RFoutfq1_unpaired="$RFoutpfx.R1.unpaired.fq.gz"
+	local RFoutfq2_unpaired="$RFoutpfx.R2.unpaired.fq.gz"
+	if [ -z "$RFmin_qual" ]; then
+		RFmin_qual=15
+	fi
+	if [ -z "$RFmin_len" ]; then
+		RFmin_len=70
+	fi
+	if [ -z "$RFnumthreads" ]; then
+		RFnumthreads=1
+	fi
+	if [ -z "$RFoptions" ]; then
+		RFoptions=" --compression 9 --cut_tail --cut_window_size 4"
+	fi
+	local RFpathdir1=$(dirname $RFoutfq1_paired)
+	if [ ! -d $RFpathdir1 ]; then
+		mkdir -p $RFpathdir1
+	fi
+	local RFpathdir2=$(dirname $RFoutfq2_paired)
+	if [ ! -d $RFpathdir2 ]; then
+		mkdir -p $RFpathdir2
+	fi
+	local RFpathdir3=$(dirname $RFoutfq1_unpaired)
+	if [ ! -d $RFpathdir3 ]; then
+		mkdir -p $RFpathdir3
+	fi
+	local RFpathdir4=$(dirname $RFoutfq2_unpaired)
+	if [ ! -d $RFpathdir4 ]; then
+		mkdir -p $RFpathdir4
+	fi
+#Parameters
+	
+	echo "${RFsubinfo}Info: fastq R1        : $RFr1"
+	echo "${RFsubinfo}Info: fastq R2        : $RFr2"
+	echo "${RFsubinfo}Info: Min Qual        : $RFmin_qual"
+	echo "${RFsubinfo}Info: Min Length      : $RFmin_len"
+	echo "${RFsubinfo}Info: threads         : $RFnumthreads"
+	echo "${RFsubinfo}Info: options         : $RFoptions"
+
+	fastp -i $RFr1 -o $RFoutfq1_paired -I $RFr2 -O $RFoutfq2_paired --unpaired1 $RFoutfq1_unpaired --unpaired2 $RFoutfq2_unpaired \
+	--thread $RFnumthreads --length_required $RFmin_len --cut_mean_quality $RFmin_qual --overrepresentation_analysis --html $RFoptions
+	if [ $? -ne 0 ]; then
+		echo "Error: fastp running error" >&2
+		echo "CMD used: fastp -i $RFr1 -o $RFoutfq1_paired -I $RFr2 -O $RFoutfq2_paired --unpaired1 $RFoutfq1_unpaired --unpaired2 $RFoutfq2_unpaired --thread $RFnumthreads --length_required $RFmin_len --cut_mean_quality $RFmin_qual --overrepresentation_analysis --html $RFoptions" >&2
+		exit 100
+	fi
+
+	if [ -s $RFoutfq1_paired ]; then
+		if [ ! -d $RFpathdir1/group ]; then
+			mkdir -p $RFpathdir1/group
+		fi
+		fastqc $RFoutfq1_paired -o $RFpathdir1/group -f fastq -t $RFnumthreads --noextract
+#		if [ ! -d $RFpathdir1/nogroup ]; then
+#			mkdir -p $RFpathdir1/nogroup
+#		fi
+#		fastqc $RFoutfq1_paired -o $RFpathdir1/nogroup -f fastq -t $RFnumthreads --noextract --nogroup
+	fi
+	if [ -s $RFoutfq2_paired ]; then
+		if [ ! -d $RFpathdir2/group ]; then
+			mkdir -p $RFpathdir2/group
+		fi
+		fastqc $RFoutfq2_paired -o $RFpathdir2/group -f fastq -t $RFnumthreads --noextract
+#		if [ ! -d $RFpathdir2/nogroup ]; then
+#			mkdir -p $RFpathdir2/nogroup
+#		fi
+#		fastqc $RFoutfq2_paired -o $RFpathdir2/nogroup -f fastq -t $RFnumthreads --noextract --nogroup
+	fi
+
+	return 0
+}
