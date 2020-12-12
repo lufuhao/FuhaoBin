@@ -1,0 +1,24 @@
+#!/usr/bin/Rscript
+#R语言指定列取交集然后合并多个数据集的简便方法
+
+
+
+### 因为5份数据集以csv格式存储，首先就是获得存储路径下所有的csv格式文件的文件名，用到的命令是
+files<-dir(path = "example_data/merge_data/", full.names = T, pattern = ".csv")
+#用到的函数是dir()
+#path参数是数据文件存储的路径
+#full.names参数如果设置为TRUE，则返回文件的完整路径，如果设置的为FALSE则只返回文件名。
+#pattern参数指定文件的后缀名
+
+
+
+### 批量将5份数据读入
+#需要借助tidyverse这个包，用到的是map()函数
+library(tidyverse)
+df<-map(files,read.csv)
+class(df)
+#df是一个列表，5份数据分别以数据框的格式存储在其中
+
+
+### 合并数据
+df1<-reduce(df,inner_join)

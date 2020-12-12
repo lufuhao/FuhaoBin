@@ -1,4 +1,5 @@
 #!/usr/bin/env perl
+
 use warnings;
 use strict;
 ###Version: 20200803
@@ -16,7 +17,7 @@ MEMEMEME
 
 
 use constant HELPOPT =><<EOP;
-
+# -*- coding: utf-8 -*-
 ################# Requirements #########################
 import getopt
 import sys
