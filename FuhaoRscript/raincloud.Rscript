@@ -1,0 +1,354 @@
+#!/usr/bin/Rscript
+
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+packages.required <- c("optparse", "dplyr", "ggplot2", "grid", "RColorBrewer", "SuppDists", "scales", "tidyr")
+
+if (!requireNamespace("BiocManager", quietly = T))
+        install.packages("BiocManager")
+invisible(library("BiocManager", character.only = T, quietly = T, warn.conflicts = FALSE))
+packages.absense <- setdiff(packages.required, rownames(installed.packages()))
+if (length(packages.absense) > 0) {
+	install.packages(packages.absense)
+}
+
+#lapply(packages.required, library, quiet=T)
+#lapply(packages.required, function(xxx) suppressMessages(require(xxx, character.only = TRUE,quietly=TRUE,warn.conflicts = FALSE)))
+invisible(lapply(packages.required, function(x) require(x, character.only = T, quietly = T, warn.conflicts = FALSE)))
+#library(optparse)
+#library(ggplot2)
+#library(grid)
+#library(RColorBrewer)
+#library(dplyr)
+### SuppDists provide rJohnson() subfunc
+#library(SuppDists)
+#library(scales)
+
+
+
+################# argument and help #########################
+option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= %default]", metavar="character"),
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", dest="file", help="Input File with colnames and rownames [default= %default]", metavar="FILE"),
+    make_option(c("-o", "--out"), type="character", default="MyOut", 
+              action = "store", dest="out", help="Output File prefix [default= %default]", metavar="PREFIX"),
+    make_option(c("--eps"), type="logical", default=FALSE, 
+              action = "store_true", help="Output EPS [default= %default]", metavar=NULL),
+    make_option(c("--svg"), type="logical", default=FALSE, 
+              action = "store_true", help="Output SVG [default= %default]", metavar=NULL),
+    make_option(c("--tif"), type="logical", default=FALSE, 
+              action = "store_true", help="Output TIFF [default= %default]", metavar=NULL),
+    make_option(c("--pdf"), type="logical", default=FALSE, 
+              action = "store_true", help="Output TIFF [default= %default]", metavar=NULL),
+    make_option(c("--width"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF width (cm) [default= %default]", metavar="float"),
+    make_option(c("--height"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF height (cm) [default= %default]", metavar="float"),
+    make_option(c("--resolution"), type="double", default=600, 
+              action = "store", help="Output TIFF resolution [default= %default]", metavar="float"),
+    make_option(c("--pointsize"), type="double", default=10, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF [default= %default]", metavar="float"),
+    make_option(c("--family"), type="character", default="Arial", 
+              action = "store", help="Output TIFF/SVG/EPS/PDF font family [default= %default]", metavar="character"),
+    make_option(c("--verbose"), type="logical", default=FALSE, 
+              action = "store_true", help="Print detailed info [default= %default]", metavar=NULL)
+  );
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to draw rain-cloud plot!")
+opt = parse_args(opt_parser)
+if (is.null(opt$file)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+
+
+
+################# input and output #########################
+print (paste0("Input File: ", opt$file))
+print (paste0("Output File: ", opt$out))
+
+
+
+################# Data import #########################
+print("Step1: Import data")
+
+raw.data <- read.table(opt$file,sep="\t", head=T, row.names = 1)
+
+f2.data <- gather(raw.data, Category, Value)
+if (opt$verbose) {
+	head(f2.data)
+}
+colnames(f2.data) <- c("Category","Value")
+if (opt$verbose) {
+	table(f2.data$Category)
+}
+f2.data<-f2.data[f2.data$Category!="N",]
+if (opt$verbose) {
+	head(f2.data)
+}
+
+
+
+################# subfunctions #########################
+#geom_violin(mapping = NULL, data = NULL, stat = "ydensity",
+#  position = "dodge", ..., draw_quantiles = NULL, trim = TRUE,
+#  scale = "area", na.rm = FALSE, show.legend = NA,
+#  inherit.aes = TRUE)
+###trim：如果为真(默认)，将小提琴的尾部修剪到数据的范围内。如果是假的，就不要修剪尾巴。
+###scale ：如果“area”(默认)，所有的小提琴有相同的区域(在修剪尾巴之前)。如果为“count”，面积按观察次数成比例缩放。如果是“宽度”，那么所有的小提琴都有相同的最大宽度。
+
+#ggplot(f2.data, aes(Category,Value))+ 
+#  geom_violin(aes(fill = Category),trim = FALSE)+
+#  geom_boxplot(width = 0.2)+
+#  scale_fill_manual(values=c(brewer.pal(5,"Set2")[c(1,3,2,5)]))+
+#  theme_classic()+
+#  labs(x='Category',y='The expression level',title='Gene name')+
+#  theme(panel.background=element_rect(fill="white",colour="black",size=0.25),
+#        axis.line=element_line(colour="black",size=0.25),
+#        axis.title=element_text(size=13,face="plain",color="black"),
+#        axis.text = element_text(size=12,face="plain",color="black"),
+#        legend.position="none"
+#  )
+
+#ggplot(f2.data, aes(Category,Value))+ 
+#  geom_violin(aes(fill = Category),trim = TRUE,scale="count")+
+#  geom_boxplot(width = 0.2)+
+#  scale_fill_manual(values=c(brewer.pal(5,"Set2")[c(1,3,2,5)]))+
+#  theme_classic()+
+#  labs(x='Category',y='The expression level',title='Gene name')+
+#  theme(panel.background=element_rect(fill="white",colour="black",size=0.25),
+#        axis.line=element_line(colour="black",size=0.25),
+#        axis.title=element_text(size=13,face="plain",color="black"),
+#        axis.text = element_text(size=12,face="plain",color="black"),
+#        legend.position="none"
+#  )
+#}
+
+###云雨图在我看来很美观，我们样本数据大的时候，绘制云雨图是真的很美观。
+###但这个图绘制比前面的图形稍微复杂一点。需要自定义一个函数，用来绘制半小提琴图，从geom-violin函数修改。下面是geom-violin函数的源码地址：
+###https://github.com/hadley/ggplot2/blob/master/R/geom-violin.r
+###下面是修改后的代码【参考资料1】：
+
+"%||%" <- function(a, b) {
+  if (!is.null(a)) a else b
+}
+
+geom_flat_violin <- function(mapping = NULL, data = NULL, stat = "ydensity",
+                             position = "dodge", trim = TRUE, scale = "area",
+                             show.legend = NA, inherit.aes = TRUE, ...) {
+  layer(
+    data = data,
+    mapping = mapping,
+    stat = stat,
+    geom = GeomFlatViolin,
+    position = position,
+    show.legend = show.legend,
+    inherit.aes = inherit.aes,
+    params = list(
+      trim = trim,
+      scale = scale,
+      ...
+    )
+  )
+}
+GeomFlatViolin <-
+  ggproto("GeomFlatViolin", Geom,
+          setup_data = function(data, params) {
+            data$width <- data$width %||% params$width %||% (resolution(data$x, FALSE) * 0.9)
+
+            # ymin, ymax, xmin, and xmax define the bounding rectangle for each group
+            data %>%
+              group_by(group) %>%
+              mutate(ymin = min(y),
+                     ymax = max(y),
+                     xmin = x,
+                     xmax = x + width / 2)
+
+          },
+
+          draw_group = function(data, panel_scales, coord) {
+            # Find the points for the line to go all the way around
+            data <- transform(data, xminv = x,
+                              xmaxv = x + violinwidth * (xmax - x)) #利用transform函数为数据框mydata增加数据
+
+            newdata <- rbind(plyr::arrange(transform(data, x = xmaxv), -y),plyr::arrange(transform(data, x = xminv), y))
+            newdata_Polygon <- rbind(newdata, newdata[1,])
+            newdata_Polygon$colour<-NA
+
+            newdata_Path <- plyr::arrange(transform(data, x = xmaxv), -y)
+
+            ggplot2:::ggname("geom_flat_violin", grobTree(
+              GeomPolygon$draw_panel(newdata_Polygon, panel_scales, coord),
+              GeomPath$draw_panel(newdata_Path, panel_scales, coord))
+            )
+          },
+
+          draw_key = draw_key_polygon,
+
+          default_aes = aes(weight = 1, colour = "grey20", fill = "white", size = 0.5,
+                            alpha = NA, linetype = "solid"),
+
+          required_aes = c("x", "y")
+  )
+
+d <- group_by(f2.data, Category) %>%
+  summarize(mean = mean(Value),
+            sd = sd(Value),
+            .groups = 'drop'
+           )
+
+
+
+
+################# Drawing plots #########################
+print("Step2: drawing flat plot1")
+### FLAT 
+###
+fig.out.pfx=paste(opt$out, ".flat.1", sep="")
+if (opt$svg) {
+	svg(filename=paste(fig.out.pfx, ".svg", sep=""), width=opt$width, height=opt$height, pointsize=opt$pointsize)
+} else if (opt$tif) {
+	tiff(filename = paste(fig.out.pfx, ".tif", sep=""), width=opt$width, height=opt$height, units = "cm", pointsize=opt$pointsize, compression = "lzw", bg = "white", res=opt$resolution, family=opt$family)
+} else if (opt$eps) {
+	setEPS()
+	postscript(paste(fig.out.pfx, ".eps", sep=""), width=opt$width, height=opt$height)
+} else if (opt$pdf) {
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize)
+} else {
+	print ("Using PDF by default")
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize)
+}
+#setEPS()
+#postscript(paste(opt$out, ".flat.1.eps", sep=""), width=opt$width, height=opt$height)
+ggplot(f2.data, aes(Category,Value, fill=Category))  +
+  geom_flat_violin(position=position_nudge(x=.2)) +
+  geom_jitter(aes(color=Category), width=.1) +
+  geom_pointrange(aes(y=mean, ymin=mean-sd, ymax=mean+sd),
+                   data=d, size=2, position=position_nudge(x=.2)) +
+  coord_flip() + 
+  theme_bw() +
+  theme( axis.text = element_text(size=13),
+         axis.title =  element_text(size=15),
+         legend.position="none")
+dev.off()
+
+
+print("Step2: drawing flat plot2")
+fig.out.pfx=paste(opt$out, ".flat.2", sep="")
+if (opt$svg) {
+	svg(filename=paste(fig.out.pfx, ".svg", sep=""), width=opt$width, height=opt$height, pointsize=opt$pointsize)
+} else if (opt$tif) {
+	tiff(filename = paste(fig.out.pfx, ".tif", sep=""), width=opt$width, height=opt$height, units = "cm", pointsize=opt$pointsize, compression = "lzw", bg = "white", res=opt$resolution, family=opt$family)
+} else if (opt$eps) {
+	setEPS()
+	postscript(paste(fig.out.pfx, ".eps", sep=""), width=opt$width, height=opt$height)
+} else if (opt$pdf) {
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize)
+} else {
+	print ("Using PDF by default")
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize)
+}
+#setEPS()
+#postscript(paste(opt$out, ".flat.2.eps", sep=""), width=opt$width, height=opt$height)
+ggplot(f2.data, aes(Category,Value, fill=Category))  +
+  geom_flat_violin(position=position_nudge(x=.2)) +
+  geom_jitter(aes(color=Category), width=.1) +
+  geom_boxplot(width=.1,position=position_nudge(x=0.19),fill="white",size=0.5) +
+  coord_flip() + 
+  theme_bw() +
+  theme( axis.text = element_text(size=13),
+         axis.title =  element_text(size=15),
+         legend.position="none")
+dev.off()
+
+
+
+print("Step2: drawing flat plot3")
+fig.out.pfx=paste(opt$out, ".flat.3", sep="")
+if (opt$svg) {
+	svg(filename=paste(fig.out.pfx, ".svg", sep=""), width=opt$width, height=opt$height, pointsize=opt$pointsize)
+} else if (opt$tif) {
+	tiff(filename = paste(fig.out.pfx, ".tif", sep=""), width=opt$width, height=opt$height, units = "cm", pointsize=opt$pointsize, compression = "lzw", bg = "white", res=opt$resolution, family=opt$family)
+} else if (opt$eps) {
+	setEPS()
+	postscript(paste(fig.out.pfx, ".eps", sep=""), width=opt$width, height=opt$height)
+} else if (opt$pdf) {
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize)
+} else {
+	print ("Using PDF by default")
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize)
+}
+#setEPS()
+#postscript(paste(opt$out, ".flat.3.eps", sep=""), width=opt$width, height=opt$height)
+ggplot(f2.data, aes(Category,Value, fill=Category))  +
+  geom_flat_violin(position=position_nudge(x=.2)) +
+  geom_dotplot(binaxis="y", stackdir="down", dotsize=.08) +   ###, binwidth=0.5
+  geom_boxplot(width=.1,position=position_nudge(x=0.19),fill="white",size=0.5) +
+  coord_flip() + 
+  theme_bw() +
+  theme( axis.text = element_text(size=13),
+         axis.title =  element_text(size=15),
+         legend.position="none")
+dev.off()
+
+#setEPS()
+#postscript(paste(opt$out, ".flat.4.eps", sep=""), width=opt$width, height=opt$height)
+#ggplot(data = f2.data, aes(Category,Value, fill=Category))  +
+#  geom_flat_violin(position = position_nudge(x = .2, y = 0), alpha = .5) +
+#  geom_boxplot(width = .1,  outlier.shape = NA, alpha = 0.5) +
+#  geom_point(aes(y = Value, color = Category), position = position_jitter(width = .15), size = .8, alpha = 0.8) +
+#  labs(x="Category",y="Value") + theme(legend.position="none") + theme(axis.title = element_text(family = "Times New Roman")) + 
+#  theme(axis.text=element_text(size=10, family = "Times New Roman")) + 
+#  theme(legend.title = element_text(family = "Times New Roman")) + 
+#  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + theme(panel.background = element_blank()) +
+#  theme(panel.border = element_rect(color = 'black',fill=NA, size = 1)) + 
+#  theme(axis.line = element_line(colour = 'black', size = 0.5)) + 
+#  theme(axis.ticks = element_line(colour = "black", size = 0.4)) + 
+#  scale_y_continuous(limits = c(.2,.8), expand = c(0,0), oob = rescale_none) +    ## y axis starts from non-zero point
+#  scale_x_discrete(expand = c(0.2,0.2)
+#  )
+#dev.off()
+
+### vertical
+###这个图就像云下面有雨滴一样，顾名思义叫云雨图。如果想纵向展示，去掉coord_flip()函数就可以啦。coord_flip()翻转笛卡尔坐标使水平变为垂直。
+print("Step3: drawing vertial plot")
+fig.out.pfx=paste(opt$out, ".vertial", sep="")
+if (opt$svg) {
+	svg(filename=paste(fig.out.pfx, ".svg", sep=""), width=opt$width, height=opt$height, pointsize=opt$pointsize)
+} else if (opt$tif) {
+	tiff(filename = paste(fig.out.pfx, ".tif", sep=""), width=opt$width, height=opt$height, units = "cm", pointsize=opt$pointsize, compression = "lzw", bg = "white", res=opt$resolution, family=opt$family)
+} else if (opt$eps) {
+	setEPS()
+	postscript(paste(fig.out.pfx, ".eps", sep=""), width=opt$width, height=opt$height)
+} else if (opt$pdf) {
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize)
+} else {
+	print ("Using PDF by default")
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize)
+}
+#setEPS()
+#postscript(paste(opt$out, ".vertial.eps", sep=""), width=opt$width, height=opt$height)
+ggplot(f2.data, aes(x=Category, y=Value))  +
+  geom_flat_violin(aes(fill=Category),position=position_nudge(x=.25),color="black") +
+  geom_jitter(aes(color=Category), width=0.1) +
+  geom_boxplot(width=.1,position=position_nudge(x=0.25),fill="white",size=0.5) +
+  theme_bw() +
+  theme( axis.text = element_text(size=13),
+         axis.title =  element_text(size=15),
+         legend.position="none")
+dev.off()

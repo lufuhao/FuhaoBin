@@ -89,6 +89,19 @@ is.installed <- function(mypkg) is.element(mypkg, installed.packages()[,1])
 #         OptionParser(usage = "usage: \%prog [options]", option_list = list(),
 #                      add_help_option = TRUE, prog = NULL, description = "",
 #                      epilogue = "")
+packages.required <- c("optparse", "dplyr", "ggplot2", "grid", "RColorBrewer", "SuppDists", "scales", "tidyr")
+
+if (!requireNamespace("BiocManager", quietly = T))
+        install.packages("BiocManager")
+invisible(library("BiocManager", character.only = T, quietly = T, warn.conflicts = FALSE))
+packages.absense <- setdiff(packages.required, rownames(installed.packages()))
+if (length(packages.absense) > 0) {
+	install.packages(packages.absense)
+}
+#lapply(packages.required, library, quiet=T)
+#lapply(packages.required, function(xxx) suppressMessages(require(xxx, character.only = TRUE,quietly=TRUE,warn.conflicts = FALSE)))
+invisible(lapply(packages.required, function(x) require(x, character.only = T, quietly = T, warn.conflicts = FALSE)))
+
 if(! require("optparse")) install.packages("optparse")
 library(optparse)
 if(! require("LinkageMapView")) install.packages("LinkageMapView")
@@ -99,24 +112,44 @@ if(! require("ComplexHeatmap"))
     BiocManager::install("ComplexHeatmap")
 library(ComplexHeatmap)
 
+
+
+packages <- c("ggplot2", "dplyr", "lavaan", "plyr", "cowplot", "rmarkdown", "readr", "caTools", "bitops")
+if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
+	install.packages(setdiff(packages, rownames(installed.packages())))
+}
+
+
+
+
 #注意，这个模块不用加上-h的flag，不然会报错
 option_list = list(
 #    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
 #              action = "store", dest=file, help="Input File[default= \%default]", metavar="character"),
     make_option(c("-f", "--file"), type="character", default=NULL, 
               action = "store", dest=file, help="Input File[default= \%default]", metavar="character"),
-    make_option(c("--title"), type="character", default="bar", 
-              action = "store", help="Title[default= \%default]", metavar="character"),
-    make_option(c("-b", "--bilv"), type="double", default="200", 
-              action = "store", help="ratio[default= \%default]", metavar="character"),
+    make_option(c("-o", "--out"), type="character", default="MyOut", 
+              action = "store", dest="out", help="Output File prefix [default= \%default]", metavar="PREFIX"),
     make_option(c("--eps"), type="logical", default=FALSE, 
-              action = "store_true", help="Output EPS [default= \%default]", metavar="character"),
-    make_option(c("--svg"), type="logical", default=TRUE, 
-              action = "store_true", help="Output SVG [default= \%default]", metavar="character"),
+              action = "store_true", help="Output EPS [default= \%default]", metavar=NULL),
+    make_option(c("--svg"), type="logical", default=FALSE, 
+              action = "store_true", help="Output SVG [default= \%default]", metavar=NULL),
     make_option(c("--tif"), type="logical", default=FALSE, 
-              action = "store_true", help="Output TIFF [default= \%default]", metavar="character"),
+              action = "store_true", help="Output TIFF [default= \%default]", metavar=NULL),
     make_option(c("--pdf"), type="logical", default=FALSE, 
-              action = "store_true", help="Output TIFF [default= \%default]", metavar="character")
+              action = "store_true", help="Output TIFF [default= \%default]", metavar=NULL),
+    make_option(c("--width"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF width (cm) [default= \%default]", metavar="float"),
+    make_option(c("--height"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF height (cm) [default= \%default]", metavar="float"),
+    make_option(c("--resolution"), type="double", default=600, 
+              action = "store", help="Output TIFF resolution [default= \%default]", metavar="float"),
+    make_option(c("--pointsize"), type="double", default=10, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF [default= \%default]", metavar="float"),
+    make_option(c("--family"), type="character", default="Arial", 
+              action = "store", help="Output TIFF/SVG/EPS/PDF font family [default= \%default]", metavar="character"),
+    make_option(c("--verbose"), type="logical", default=FALSE, 
+              action = "store_true", help="Print detailed info [default= \%default]", metavar=NULL)
   );
 
 #opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
@@ -129,6 +162,11 @@ if (is.null(opt\$f)){
 }
 if (is.null(opt\$outtable)){opt\$outtable=paste(opt\$f,'.xls',sep='')}
 if (is.null(opt\$outpdf)){opt\$outpdf=paste(opt\$f,'.pdf',sep='')}
+
+
+################# input and output #########################
+print (paste0("Input File: ", opt\$file))
+print (paste0("Output File: ", opt\$out))
 
 
 ### BitMap
@@ -180,23 +218,23 @@ pdf("plots.pdf", width=10/2.54, height=6/2.54)
 #tiff(filename = paste(args[1], ".tif", sep=""), width = 8, height = 8, units = "cm", pointsize = 12, compression = "lzw", bg = "white", res = 600, family = "Arial")
 
 if (opt\$svg) {
-	svg(filename=paste(opt\$p, ".svg", sep=""), width=5, height=4, pointsize=12)
+	svg(filename=paste(fig.out.pfx, ".svg", sep=""), width=opt\$width/cm(1), height=opt\$height/cm(1), pointsize=opt\$pointsize, bg = "white", family=opt\$family)
 	My.Plot
 	dev.off()
 }
 if (opt\$pdf) {
-	pdf(file=paste(opt\$p, ".pdf", sep=""))
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt\$width/cm(1), height=opt\$height/cm(1), pointsize=opt\$pointsize, family=opt\$family, bg = "white")
 	My.Plot
 	dev.off()
 }
 if (opt\$tif) {
-	tiff(filename = paste(opt\$p, ".tif", sep=""), width = 8, height = 8, units = "cm", pointsize = 12, compression = "lzw", bg = "white", res = 600, family = "Arial")
+	tiff(filename = paste(fig.out.pfx, ".tif", sep=""), width=opt\$width, height=opt\$height, units = "cm", pointsize=opt\$pointsize, compression = "lzw", bg = "white", res=opt\$resolution, family=opt\$family)
 	My.Plot
 	dev.off()
 }
 if (opt\$eps) {
 	setEPS()
-	postscript(paste(opt\$p, ".eps", sep=""), width=1, height=1, pointsize=10)
+	postscript(paste(fig.out.pfx, ".eps", sep=""), width=opt\$width/cm(1), height=opt\$height/cm(1), pointsize=opt\$pointsize, family=opt\$family, bg = "white")
 	My.Plot
 	dev.off()
 }
