@@ -91,6 +91,8 @@ is.installed <- function(mypkg) is.element(mypkg, installed.packages()[,1])
 #                      epilogue = "")
 packages.required <- c("optparse", "dplyr", "ggplot2", "grid", "RColorBrewer", "SuppDists", "scales", "tidyr")
 
+
+
 if (!requireNamespace("BiocManager", quietly = T))
         install.packages("BiocManager")
 invisible(library("BiocManager", character.only = T, quietly = T, warn.conflicts = FALSE))
@@ -121,6 +123,31 @@ if (length(setdiff(packages, rownames(installed.packages()))) > 0) {
 
 
 
+### Alternative
+for (pkg in cran_packages){
+	if (! require(pkg,character.only=T) ) {
+		install.packages(pkg,ask = F,update = F)
+		require(pkg,character.only=T) 
+	}
+}
+# first prepare BioManager on CRAN
+if(!require("BiocManager")) install.packages("BiocManager",update = F,ask = F)
+# use BiocManager to install
+for (pkg in Biocductor_packages){
+	if (! require(pkg,character.only=T) ) {
+		BiocManager::install(pkg,ask = F,update = F)
+		require(pkg,character.only=T) 
+	}
+}
+for (pkg in c(Biocductor_packages,cran_packages)){
+	require(pkg,character.only=T) 
+}
+if(!require(tinyarray))devtools::install_local("tinyarray-master.zip",upgrade = F)
+
+
+
+
+
 
 #注意，这个模块不用加上-h的flag，不然会报错
 option_list = list(
@@ -146,7 +173,7 @@ option_list = list(
               action = "store", help="Output TIFF resolution [default= \%default]", metavar="float"),
     make_option(c("--pointsize"), type="double", default=10, 
               action = "store", help="Output TIFF/SVG/EPS/PDF [default= \%default]", metavar="float"),
-    make_option(c("--family"), type="character", default="Arial", 
+    make_option(c("--family"), type="character", default="ArialMT", 
               action = "store", help="Output TIFF/SVG/EPS/PDF font family [default= \%default]", metavar="character"),
     make_option(c("--verbose"), type="logical", default=FALSE, 
               action = "store_true", help="Print detailed info [default= \%default]", metavar=NULL)
@@ -156,12 +183,12 @@ option_list = list(
 opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!")
 opt = parse_args(opt_parser)
 
-if (is.null(opt\$f)){
+if (is.null(opt\$file)){
 	print_help(opt_parser)
 	stop("Error: invalid input file", call.=FALSE)
 }
-if (is.null(opt\$outtable)){opt\$outtable=paste(opt\$f,'.xls',sep='')}
-if (is.null(opt\$outpdf)){opt\$outpdf=paste(opt\$f,'.pdf',sep='')}
+if (is.null(opt\$outtable)){opt\$outtable=paste(opt\$file,'.xls',sep='')}
+if (is.null(opt\$outpdf)){opt\$outpdf=paste(opt\$file,'.pdf',sep='')}
 
 
 ################# input and output #########################

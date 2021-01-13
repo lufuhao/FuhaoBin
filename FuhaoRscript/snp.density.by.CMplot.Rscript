@@ -1,0 +1,48 @@
+#!/usr/bin/Rscript
+### https://github.com/YinLiLin/R-CMplot
+install.packages("CMplot")
+library("CMplot")
+
+snp_file="data.txt"
+binsize=1e6
+outPfx="MyOut"
+
+# 要绘制 SNP 密度图，仅仅需要三列即可：
+# a. 第一列是 SNP 名称
+# b. 第二列是染色体
+# c. 第三列是 SNP 的位置
+# d. 第四列开始为不同性状的P值
+
+
+### 1. 示例数据：
+
+#          SNP Chromosome Position    trait1     trait2     trait3
+#1 ALGA0000009          1    52297 0.7738187 0.51194318 0.51194318
+#2 ALGA0000014          1    79763 0.7738187 0.51194318 0.51194318
+#3 ALGA0000021          1   209568 0.7583016 0.98405289 0.98405289
+#4 ALGA0000022          1   292758 0.7200305 0.48887140 0.48887140
+#5 ALGA0000046          1   747831 0.9736840 0.22096836 0.22096836
+#6 ALGA0000047          1   761957 0.9174565 0.05753712 0.05753712
+
+
+### 2. 作图代码
+首先读取数据
+snp <- read.table(snp_file,header=T)
+
+
+
+### 3.1 密度条形图
+# users can personally set the windowsize and the max of legend by:
+# bin.size=1e6
+# bin.max=N
+# memo: add a character to the output file name.
+
+data(snp)
+CMplot(
+        snp, plot.type="d", bin.size=binsize, col=c("darkgreen", "yellow", "red"),
+        file="tiff", memo="Fig1"), dpi=600, file.output=TRUE, verbose=TRUE)
+
+### 3.2 示例2 -- 环状图
+CMplot( snp, plot.type="c", chr.labels=paste("Chr",c(1:18,"X"), sep=""), r=0.4, cir.legend=TRUE,
+        outward=FALSE, cir.legend.col="black", cir.chr.h=1.3, chr.den.col="black", file="jpg",
+        memo="Fig2", dpi=600, file.output=TRUE, verbose=TRUE)

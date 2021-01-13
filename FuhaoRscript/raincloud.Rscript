@@ -48,6 +48,16 @@ option_list = list(
               action = "store", dest="file", help="Input File with colnames and rownames [default= %default]", metavar="FILE"),
     make_option(c("-o", "--out"), type="character", default="MyOut", 
               action = "store", dest="out", help="Output File prefix [default= %default]", metavar="PREFIX"),
+    make_option(c("--min"), type="double", default=0, 
+              action = "store", help="Minimum value to plot [after transform] [default= %default]", metavar="float"),
+    make_option(c("--xlab"), type="character", default="Category", 
+              action = "store", help="xlab name [default= %default]", metavar="character"),
+    make_option(c("--ylab"), type="character", default="Value", 
+              action = "store", help="ylab name [default= %default]", metavar="character"),
+    make_option(c("--log2"), type="logical", default=FALSE, 
+              action = "store_true", help="log2 transform [default= %default]", metavar=NULL),
+    make_option(c("--log2p1"), type="logical", default=FALSE, 
+              action = "store_true", help="log2 transform (value+1) [default= %default]", metavar=NULL),
     make_option(c("--eps"), type="logical", default=FALSE, 
               action = "store_true", help="Output EPS [default= %default]", metavar=NULL),
     make_option(c("--svg"), type="logical", default=FALSE, 
@@ -78,6 +88,7 @@ if (is.null(opt$file)){
 
 
 
+
 ################# input and output #########################
 print (paste0("Input File: ", opt$file))
 print (paste0("Output File: ", opt$out))
@@ -88,18 +99,37 @@ print (paste0("Output File: ", opt$out))
 print("Step1: Import data")
 
 raw.data <- read.table(opt$file,sep="\t", head=T, row.names = 1)
+raw.order <- as.factor(colnames(raw.data))
+if (opt$log2) {
+	raw.data <- log2(raw.data)
+	if (opt$verbose) {
+		head(raw.data)
+	}
+} else if (opt$log2p1) {
+	raw.data <- log2(raw.data +1)
+	if (opt$verbose) {
+		head(raw.data)
+	}
+}
+
+
 
 f2.data <- gather(raw.data, Category, Value)
 if (opt$verbose) {
 	head(f2.data)
 }
 colnames(f2.data) <- c("Category","Value")
+f2.data <- f2.data[which(f2.data$Value>=opt$min),]
 if (opt$verbose) {
 	table(f2.data$Category)
 }
 f2.data<-f2.data[f2.data$Category!="N",]
 if (opt$verbose) {
 	head(f2.data)
+}
+f2.data$Category <- factor(f2.data$Category, levels=raw.order)
+if (opt$verbose) {
+	f2.data$Category
 }
 
 
@@ -235,16 +265,18 @@ if (opt$svg) {
 }
 #setEPS()
 #postscript(paste(opt$out, ".flat.1.eps", sep=""), width=opt$width, height=opt$height)
-ggplot(f2.data, aes(Category,Value, fill=Category))  +
+ggplot(f2.data, aes(Category,Value, fill=Category)) +
   geom_flat_violin(position=position_nudge(x=.2)) +
-  geom_jitter(aes(color=Category), width=.1) +
+  geom_jitter(aes(color=Category), width=.1, size=0.05) +
   geom_pointrange(aes(y=mean, ymin=mean-sd, ymax=mean+sd),
-                   data=d, size=2, position=position_nudge(x=.2)) +
+                   data=d, size=0.5, position=position_nudge(x=.2)) +
   coord_flip() + 
   theme_bw() +
   theme( axis.text = element_text(size=13),
          axis.title =  element_text(size=15),
-         legend.position="none")
+         legend.position="none") +
+  xlab(opt$xlab) +
+  ylab(opt$ylab)
 dev.off()
 
 
@@ -267,13 +299,15 @@ if (opt$svg) {
 #postscript(paste(opt$out, ".flat.2.eps", sep=""), width=opt$width, height=opt$height)
 ggplot(f2.data, aes(Category,Value, fill=Category))  +
   geom_flat_violin(position=position_nudge(x=.2)) +
-  geom_jitter(aes(color=Category), width=.1) +
-  geom_boxplot(width=.1,position=position_nudge(x=0.19),fill="white",size=0.5) +
+  geom_jitter(aes(color=Category), width=.1, size=0.05) +
+  geom_boxplot(width=.1,position=position_nudge(x=0.19),fill="white",size=0.1, outlier.size=0.1) +
   coord_flip() + 
   theme_bw() +
   theme( axis.text = element_text(size=13),
          axis.title =  element_text(size=15),
-         legend.position="none")
+         legend.position="none") +
+  xlab(opt$xlab) +
+  ylab(opt$ylab)
 dev.off()
 
 
@@ -298,12 +332,14 @@ if (opt$svg) {
 ggplot(f2.data, aes(Category,Value, fill=Category))  +
   geom_flat_violin(position=position_nudge(x=.2)) +
   geom_dotplot(binaxis="y", stackdir="down", dotsize=.08) +   ###, binwidth=0.5
-  geom_boxplot(width=.1,position=position_nudge(x=0.19),fill="white",size=0.5) +
+  geom_boxplot(width=.1,position=position_nudge(x=0.19),fill="white",size=0.1, outlier.size=0.1) +
   coord_flip() + 
   theme_bw() +
   theme( axis.text = element_text(size=13),
          axis.title =  element_text(size=15),
-         legend.position="none")
+         legend.position="none") +
+  xlab(opt$xlab) +
+  ylab(opt$ylab)
 dev.off()
 
 #setEPS()
@@ -345,10 +381,13 @@ if (opt$svg) {
 #postscript(paste(opt$out, ".vertial.eps", sep=""), width=opt$width, height=opt$height)
 ggplot(f2.data, aes(x=Category, y=Value))  +
   geom_flat_violin(aes(fill=Category),position=position_nudge(x=.25),color="black") +
-  geom_jitter(aes(color=Category), width=0.1) +
-  geom_boxplot(width=.1,position=position_nudge(x=0.25),fill="white",size=0.5) +
+  geom_jitter(aes(color=Category), width=0.1, size=0.05) +
+  geom_boxplot(width=.1,position=position_nudge(x=0.25),fill="white",size=0.1, outlier.size=0.1) +
   theme_bw() +
-  theme( axis.text = element_text(size=13),
-         axis.title =  element_text(size=15),
-         legend.position="none")
+  theme( axis.text = element_text(size=10),
+         axis.title =  element_text(size=10),
+         legend.position="none",
+         axis.text.x = element_text(angle = 90)) +
+  xlab(opt$xlab) +
+  ylab(opt$ylab)
 dev.off()

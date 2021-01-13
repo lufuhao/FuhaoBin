@@ -1,0 +1,190 @@
+#!/usr/bin/Rscript
+
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+
+################# Requirements #########################
+# optparse
+#     install.packages("optparse")
+#         OptionParser(usage = "usage: %prog [options]", option_list = list(),
+#                      add_help_option = TRUE, prog = NULL, description = "",
+#                      epilogue = "")
+packages.required <- c("optparse", "purrr", "tidyverse", "clusterProfiler", "enrichplot")
+
+if (!requireNamespace("BiocManager", quietly = T))
+        install.packages("BiocManager")
+invisible(library("BiocManager", character.only = T, quietly = T, warn.conflicts = FALSE))
+packages.absense <- setdiff(packages.required, rownames(installed.packages()))
+if (length(packages.absense) > 0) {
+	install.packages(packages.absense)
+}
+invisible(lapply(packages.required, function(x) require(x, character.only = T, quietly = T, warn.conflicts = FALSE)))
+
+
+
+### 注意，这个模块不用加上-h的flag，不然会报错
+option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= %default]", metavar="character"),
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", help="Input File[default= %default]", metavar="character"),
+    make_option(c("-o", "--out"), type="character", default="MyOut", 
+              action = "store", help="Output File prefix [default= %default]", metavar="PREFIX"),
+#    make_option(c("--eps"), type="logical", default=FALSE, 
+#              action = "store_true", help="Output EPS [default= %default]", metavar=NULL),
+#    make_option(c("--svg"), type="logical", default=FALSE, 
+#              action = "store_true", help="Output SVG [default= %default]", metavar=NULL),
+#    make_option(c("--tif"), type="logical", default=FALSE, 
+#              action = "store_true", help="Output TIFF [default= %default]", metavar=NULL),
+#    make_option(c("--pdf"), type="logical", default=FALSE, 
+#              action = "store_true", help="Output TIFF [default= %default]", metavar=NULL),
+    make_option(c("--width"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF width (cm) [default= %default]", metavar="float"),
+    make_option(c("--height"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF height (cm) [default= %default]", metavar="float"),
+    make_option(c("--resolution"), type="double", default=600, 
+              action = "store", help="Output TIFF resolution [default= %default]", metavar="float"),
+    make_option(c("--pointsize"), type="double", default=10, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF [default= %default]", metavar="float"),
+    make_option(c("--family"), type="character", default="ArialMT", 
+              action = "store", help="Output TIFF/SVG/EPS/PDF font family [default= %default]", metavar="character"),
+    make_option(c("--verbose"), type="logical", default=FALSE, 
+              action = "store_true", help="Print detailed info [default= %default]", metavar=NULL)
+);
+
+#opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!")
+opt = parse_args(opt_parser)
+
+if (is.null(opt$file)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+
+
+
+################# input and output #########################
+print (paste0("Input File: ", opt$file))
+print (paste0("Output File: ", opt$out))
+geneDeg=opt$file
+outPfx=opt$out
+
+
+
+################################################
+# 导入自己构建的 OrgDb
+################################################
+library(purrr)
+library(tidyverse)
+library(clusterProfiler)
+library(enrichplot)
+#install.packages("org.xxx.db", repos=NULL, type="sources")
+library(org.Taestivum.eg.db)
+
+
+# 导入需要进行富集分析的基因列表，并转换为向量
+#########################################################################################
+#geneList=read.table("DEG.list")
+geneList=read.table(geneDeg)
+keytypes(org.Taestivum.eg.db)
+columns(org.Taestivum.eg.db)
+#ID转换
+#go_ythdf2_id_trance <- bitr(go_ythdf2,fromType = "SYMBOL",toType = "ENTREZID",
+                            OrgDb = "org.Hs.eg.db",drop = T)
+
+
+
+################################################
+# 从 OrgDB 提取 Pathway 和基因的对应关系
+################################################
+#AnnotationDbi::select(org.Taestivum.eg.db, keys = c("TraesCS1A02G001800.1"), columns = c("EVIDENCE", "EVIDENCEALL", "GENENAME", "GID", "GO", "GOALL", "KO", "ONTOLOGY", "ONTOLOGYALL", "Pathway")) ### for Test
+pathway2gene <- AnnotationDbi::select(org.Taestivum.eg.db,
+                                      keys = keys(org.Taestivum.eg.db), 
+                                      columns = c("Pathway", "GID")) %>%
+  dplyr::select(Pathway, GID) %>%
+  na.omit()
+head(pathway2gene)
+
+
+
+################################################
+# 导入 Pathway 与名称对应关系
+################################################
+oPfx=paste0(outPfx, ".pathway2name")
+if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+	print (paste0("    Loading:", oPfx, ".Rdata"))
+	load(paste0(oPfx, ".Rdata"))
+} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+	print (paste0("    Loading:", oPfx, ".tab"))
+	gterms<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=T)
+	save(gterms, file = paste0(oPfx, ".Rdata"))
+} else {
+	stop("Error: invalid pathway2name not found", call.=FALSE)
+}
+head(pathway2gene)
+head(pathway2name)
+
+
+
+
+################################################
+#KEGG pathway 富集
+#write.table(pathway2gene,file = paste0(outPfx, ".pathway2gene.tab"), sep="\t", quote=F, row.names=F, col.names=T)
+#save(pathway2gene, file = paste0(outPfx, ".pathway2gene.Rdata"))
+#gene2ko <- read.table(paste0(outPfx, ".gene2ko.tab"), sep = "\t", , header=T)
+colnames(geneList)=c("GID")
+ekp <- enricher(geneList$GID,
+                TERM2GENE = pathway2gene,
+                TERM2NAME = pathway2name,
+                pvalueCutoff = 0.05, 
+                qvalueCutoff = 0.05,
+                pAdjustMethod = "BH",
+                minGSSize = 10)
+
+#ekp_results <- as.data.frame(ekp)
+
+write.table(ekp,paste0(outPfx, ".KEGG.tab"),quote = F ,sep = "\t")
+
+###GO富集分析
+#ont #GO 分类名称，CC BP MF
+for (indOnt in c("CC", "BP", "MF")) {
+	print (paste("Gene Ontology: ", indOnt))
+	ego <- enrichGO(gene = geneList$GID, keyType = "GID", OrgDb = "org.Taestivum.eg.db", ont = indOnt, pvalueCutoff = 0.05, qvalueCutoff = 0.05, readable = TRUE)
+#readable=T 绘图显示基因名
+
+#	###生成的ego文件转换成data.frame格式即可
+#	ego_results<-as.data.frame(ego)
+
+	dim(ego)
+	
+	oPfx=paste0(outPfx, ".GO.", indOnt)
+	write.table(ego_results, file = paste0(oPfx, ".tab"), quote = F)
+	
+	#pdf(file=paste0(oPfx, ".barplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+	pdf(file=paste0(oPfx, ".barplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	barplot(ego, showCategory=20, x = "GeneRatio")
+	dev.off()
+
+	#pdf(file=paste0(oPfx, ".dotplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+	pdf(file=paste0(oPfx, ".dotplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	dotplot(ego, showCategory=20, orderBy="pvalue")
+	dev.off()
+
+	#pdf(file=paste0(oPfx, ".emapplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+	pdf(file=paste0(oPfx, ".emapplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	ego_sim<-pairwise_termsim(ego)
+	emapplot(ego_sim)
+	dev.off()
+	
+	#pdf(file=paste0(oPfx, ".cnetplot.pdf"), width=17/cm(1), height=17/cm(1), pointsize=10, family="ArialMT", bg = "white")
+	pdf(file=paste0(oPfx, ".cnetplot.pdf"), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	cnetplot(ego, showCategory = 20)
+	dev.off()
+}
+
