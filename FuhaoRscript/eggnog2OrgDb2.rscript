@@ -1,0 +1,350 @@
+#!/usr/bin/env Rscript
+
+
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+
+packages.required <- c("optparse", "clusterProfiler", "dplyr", "stringr", "jsonlite", "purrr", "RCurl")
+
+if (! requireNamespace("BiocManager", quietly = T))
+        install.packages("BiocManager")
+invisible(library("BiocManager", character.only = T, quietly = T, warn.conflicts = FALSE))
+packages.absense <- setdiff(packages.required, rownames(installed.packages()))
+if (length(packages.absense) > 0) {
+	install.packages(packages.absense)
+}
+invisible(lapply(packages.required, function(x) require(x, character.only = T, quietly = T, warn.conflicts = FALSE)))
+
+
+option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= %default]", metavar="character"),
+    make_option(c("-i", "--input"), type="character", default=NULL, 
+              action = "store", help="eggnog2clusterProfiles.sh output [default= %default]", metavar="character"),
+    make_option(c("-j", "--json"), type="character", default=NULL, 
+              action = "store", help="JSON File [default= %default]", metavar="character"),
+    make_option(c("-d", "--outdir"), type="character", default=NULL, 
+              action = "store", help="Output path [default= %default]", metavar="character"),
+    make_option(c("-p", "--prefix"), type="character", default="MyOut", 
+              action = "store", help="Output File prefix [default= %default]", metavar="PREFIX"),
+    make_option(c("--verbose"), type="logical", default=FALSE, 
+              action = "store_true", help="Print detailed info [default= %default]", metavar=NULL)
+  );
+
+#opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!\nFor example:\neggnog2OrgDb2.rscript --input /home/lufuhao/Desktop/wheat.v1.eggnog.annotations --json /home/lufuhao/Desktop/ko00001.json -d /home/lufuhao/Desktop/20200106 -p wheat.v1\n\n###OutPfx.gene_info.tab\nGID	GENENAME\nTraesCS1A02G000100.1	4572.TRIUR3_00132-P1\nTraesCS1A02G000200.1	4572.TRIUR3_00007-P1\nTraesCS1A02G000300.1	4572.TRIUR3_00007-P1\n\n###OutPfx.gterms.tab\nquery_name	GOs\nTraesCS1A02G001800.1	GO:0003674,GO:0003735\nTraesCS1A02G001900.1	GO:0003674,GO:0005102\nTraesCS1A02G002000.1	GO:0003674,GO:0003824\n\n###OutPfx.gene2go.tab\nGID	GO	EVIDENCE\nTraesCS1A02G001800.1	GO:0003674	IEA\nTraesCS1A02G001800.1	GO:0003735	IEA\nTraesCS1A02G001800.1	GO:0005198	IEA\n\n###OutPfx.gene2ko.tab\nGID	KO\nTraesCS1A02G001800.1	K02902\nTraesCS1A02G001900.1	K13343\nTraesCS1A02G001900.1	K16284\n\n###OutPfx.gene2pathway.tab\nGID	Pathway\nTraesCS1A02G001800.1	ko03010\nTraesCS1A02G001800.1	ko03011\nTraesCS1A02G001900.1	ko04146\n\n###OutPfx.gene2go.tab\nKO	Pathway\nK00844	ko00010\nK12407	ko00010\nK00845	ko00010\n\n###OutPfx.pathway2name.tab\nPathway	Name\nko00010	Glycolysis / Gluconeogenesis\nko00020	Citrate cycle (TCA cycle)\nko00030	Pentose phosphate pathway")
+
+opt = parse_args(opt_parser)
+
+if (is.null(opt$input)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+
+
+
+
+################# input and output #########################
+print (paste0("Input File: ", opt$input))
+print (paste0("Output File: ", opt$prefix))
+print (paste0("Output Dir: ", opt$outdir))
+print (paste0("Output prefix: ", opt$prefix))
+
+#egg_input="wheat.v1.eggnog.annotations"
+#out_dir="/home/lufuhao/Desktop"
+#outPfx="wheat.v1.eggnog"
+egg_input=opt$input
+json_file=opt$json
+out_dir=opt$outdir
+outPfx=opt$prefix
+orgDbVersion="2021.01.06"
+orgDbTaxid="4565"
+orgDbGenus = "Triticum"
+orgDbSpecies = "aestivum"
+
+
+### Input output
+if (! file_test("-d", out_dir)) {
+	dir.create(out_dir, showWarnings = TRUE, recursive=T, mode = "0755")
+}
+setwd(out_dir)
+
+
+### https://www.jianshu.com/p/bb4281e6604e
+### https://cloud.tencent.com/developer/article/1607669
+### https://sr-c.github.io/2018/12/01/clusterProfiler/
+### https://my.oschina.net/u/4339825/blog/3318886
+
+
+
+
+### 需要下载 json文件(这是是经常更新的)
+### https://www.genome.jp/kegg-bin/get_htext?ko00001
+### 代码来自：http://www.genek.tv/course/225/task/4861/show
+#library(jsonlite)
+#library(purrr)
+#library(RCurl)
+update_kegg <- function(json = "ko00001.json") {
+	print (paste0("    Reading json: ", json))
+	pathway2name <- tibble(Pathway = character(), Name = character())
+	ko2pathway <- tibble(KO = character(), Pathway = character())
+	kegg <- fromJSON(json)
+	for (a in seq_along(kegg[["children"]][["children"]])) {
+		A <- kegg[["children"]][["name"]][[a]]
+		for (b in seq_along(kegg[["children"]][["children"]][[a]][["children"]])) {
+			B <- kegg[["children"]][["children"]][[a]][["name"]][[b]] 
+			for (c in seq_along(kegg[["children"]][["children"]][[a]][["children"]][[b]][["children"]])) {
+				pathway_info <- kegg[["children"]][["children"]][[a]][["children"]][[b]][["name"]][[c]]
+				pathway_id <- str_match(pathway_info, "ko[0-9]{5}")[1]
+				pathway_name <- str_replace(pathway_info, " \\[PATH:ko[0-9]{5}\\]", "") %>% str_replace("[0-9]{5} ", "")
+				pathway2name <- rbind(pathway2name, tibble(Pathway = pathway_id, Name = pathway_name))
+				kos_info <- kegg[["children"]][["children"]][[a]][["children"]][[b]][["children"]][[c]][["name"]]
+				kos <- str_match(kos_info, "K[0-9]*")[,1]
+				ko2pathway <- rbind(ko2pathway, tibble(KO = kos, Pathway = rep(pathway_id, length(kos))))
+			}
+		}
+	}
+	colnames(ko2pathway)=c("KO", "Pathway")
+	write.table(ko2pathway, file = paste0(outPfx, ".ko2pathway.tab"), sep="\t", quote=F, row.names=F, col.names=T)
+	save(ko2pathway, file = paste0(outPfx, ".ko2pathway.Rdata"))
+
+	write.table(pathway2name,file = paste0(outPfx, ".pathway2name.tab"), sep="\t", quote=F, row.names=F, col.names=T)
+	save(pathway2name, file = paste0(outPfx, ".pathway2name.Rdata"))
+
+	return(ko2pathway)
+}
+
+
+makeOrgPackageFromEmapper <- function(f_emapper_anno, 
+                                      version="v1",
+                                      tax_id = "0",
+                                      genus = "default",
+                                      species = "default") {
+	### STEP1: 自己构建的话，首先需要读入文件
+	#na.strings = "", comment.char = "", check.names = FALSE
+	print (paste0("### Step1: Reading Eggnog: ", f_emapper_anno))
+	egg <- read.table(f_emapper_anno, sep = "\t", quote="", header=T, stringsAsFactors = FALSE)
+	### 文件共有22列: 2. seed eggNOG ortholog 在eggnog中比对到的最佳结果
+
+	#这个代码来自花花的指导(将空行变成NA，方便下面的去除)
+	egg[egg==""]<-NA
+	head(egg)
+
+	### STEP2: 从文件中挑出基因query_name与eggnog注释信息
+	print (paste0("### Step2: gene_info"))
+	oPfx=paste0(outPfx, ".gene_info")
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gene_info<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=T)
+		save(gterms, file = paste0(oPfx, ".Rdata"))
+	} else {
+		print ("    Loading gene_info from eggnog")
+		gene_info <- egg %>% dplyr::select(GID = query_name, GENENAME = seed_eggNOG_ortholog) %>% na.omit()
+		write.table(gene_info,file = paste0(oPfx, ".tab"), sep="\t", quote=F, row.names=F, col.names=T)
+		save(gene_info, file = paste0(oPfx, ".Rdata"))
+	}
+
+	### STEP3：挑出query_name与GO注释信息
+	print (paste0("### Step3: gterms"))
+	oPfx=paste0(outPfx, ".gterms")
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gterms<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=T)
+		save(gterms, file = paste0(oPfx, ".Rdata"))
+	} else {
+		print ("    Loading gterms from eggnog")
+		gterms <- egg %>% dplyr::select(query_name, GOs) %>% na.omit()
+		write.table(gterms,file = paste0(oPfx, ".tab"), sep="\t", quote=F, row.names=F, col.names=T)
+		save(gterms, file = paste0(oPfx, ".Rdata"))
+	}
+	
+
+	### STEP4：我们想得到query_name与GO号的对应信息
+	### 先构建一个空的数据框(弄好大体的架构，表示其中要有GID =》query_name，GO =》GO号， EVIDENCE =》默认IDA)
+	### 关于IEA：就是一个标准，除了这个标准以外还有许多。IEA就是表示我们的注释是自动注释，无需人工检查http://wiki.geneontology.org/index.php/Inferred_from_Electronic_Annotation_(IEA)
+	### 两种情况下需要用IEA：
+	### 1. manually constructed mappings between external classification systems and GO terms;
+	### 2. automatic transfer of annotation to orthologous gene products.
+	print (paste0("### Step4: gene2go"))
+	oPfx=paste0(outPfx, ".gene2go")
+	gene2go <- data.frame(GID = character(), GO = character(), EVIDENCE = character())
+	### 然后向其中填充：注意到有的query_name对应多个GO，因此我们以GO号为标准，每一行只能有一个GO号，但query_name和Evidence可以重复
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+		gene2go<-unique(gene2go)
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gene2go<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=T)
+		gene2go<-unique(gene2go)
+		save(gene2go, file = paste0(oPfx, ".Rdata"))
+	} else {
+		print ("    Loading gene2go from eggnog")
+		for (row in 1:nrow(gterms)) {
+#			print (gterms[row, ])
+			gene_terms <- str_split(gterms[row,"GOs"], ",", simplify = FALSE)[[1]]
+			gene_id <- gterms[row, "query_name"][[1]]
+			tmp <- data_frame(GID = rep(gene_id, length(gene_terms)),
+			                  GO = gene_terms,
+			                  EVIDENCE = rep("IEA", length(gene_terms)))
+			gene2go <- rbind(gene2go, tmp)
+		}
+		gene2go<-unique(gene2go)
+		write.table(gene2go,file = paste0(oPfx, ".tab"), sep="\t", quote=F, row.names=F, col.names=T)
+		save(gene2go, file = paste0(oPfx, ".Rdata"))
+	}
+#	gene2go<-gene2go[!duplicated(gene2go),]
+	
+
+
+
+	### STEP5: 挑出query_name与KEGG注释信息
+	print (paste0("### Step4: gene2ko"))
+	oPfx=paste0(outPfx, ".gene2ko")
+	gene2ko <- data.frame(GID = character(), KO = character())
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+		gene2ko<-unique(gene2ko)
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gene2ko<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=T)
+		gene2ko<-unique(gene2ko)
+		save(gene2ko, file = paste0(oPfx, ".Rdata"))
+	} else {
+		print ("    Loading gene2ko from eggnog")
+		if (T) {
+			kterms <- egg %>% dplyr::select(GID = query_name, KO = KEGG_ko) %>% na.omit()
+			for (row in 1:nrow(kterms)) {
+#				print (kterms[row, ])
+				ko_terms <- str_split(kterms[row,"KEGG_ko"], ",", simplify = FALSE)[[1]]
+				for (indnum in 1:length(ko_terms)) {
+					ko_terms[indnum]<-gsub("^ko:", "", ko_terms[indnum])
+				}
+				gene_id <- kterms[row, "query_name"][[1]]
+				tmp <- data_frame(GID = rep(gene_id, length(ko_terms)), KO = ko_terms)
+				
+				gene2ko <- rbind(gene2ko, tmp)
+			}
+		} else {
+			gene2ko <- egg %>% dplyr::select(GID = query_name, KO = KEGG_ko) %>% na.omit()
+		}
+		gene2ko<-unique(gene2ko)
+		write.table(gene2ko,file = paste0(oPfx, ".tab"), sep="\t", quote=F, row.names=F, col.names=T)
+		save(gene2ko, file = paste0(oPfx, ".Rdata"))
+	}
+#	gene2ko<-gene2ko[!duplicated(gene2ko),]
+	colnames(gene2ko)=c("GID", "KO")
+	head(gene2ko)
+
+
+	### STEP5: 得到ko2pathway
+	print (paste0("### Step5: ko2pathway"))
+	oPfx=paste0(outPfx, ".ko2pathway")
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		ko2pathway<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=T)
+	} else {
+		print ("    Loading ko2pathway from eggnog")
+		ko2pathway <- update_kegg(json = json_file)
+	}
+	head(ko2pathway)
+
+
+	### STEP6: 利用GO将gene与pathway联系起来，然后挑出query_name与pathway注释信息
+	print (paste0("### Step6: gene2pathway"))
+	oPfx=paste0(outPfx, ".gene2pathway")
+	if (file_test("-f", paste0(oPfx, ".Rdata"))) {
+		print (paste0("    Loading:", oPfx, ".Rdata"))
+		load(paste0(oPfx, ".Rdata"))
+	} else if (file_test("-f", paste0(oPfx, ".tab"))) {
+		print (paste0("    Loading:", oPfx, ".tab"))
+		gene2pathway<-read.table(file = paste0(oPfx, ".tab"), sep="\t", quote="", row.names=NULL, col.names=T)
+		gene2pathway<-unique(gene2pathway)
+		save(gene2pathway, file = paste0(oPfx, ".Rdata"))
+	} else {
+		print ("    Loading gene2pathway from eggnog")
+		head(gene2ko)
+		head(ko2pathway)
+		gene2pathway <- gene2ko %>% left_join(ko2pathway, by = "KO") %>% dplyr::select(GID, Pathway) %>% na.omit()
+		gene2pathway<-unique(gene2pathway)
+		write.table(gene2pathway,file = paste0(oPfx, ".tab"), sep="\t", quote=F, row.names=FALSE, col.names=T)
+		save(gene2pathway, file = paste0(oPfx, ".Rdata"))
+	}
+#	gene2pathway<-gene2pathway[!duplicated(gene2pathway),]
+	head(gene2pathway)
+
+	library(AnnotationForge,quietly = TRUE)
+	library(RSQLite,quietly = TRUE)
+	library(DBI,quietly = TRUE)
+	### STEP6: 制作自己的Orgdb
+	### 查询物种的Taxonomy，例如要查sesame
+	### https://www.ncbi.nlm.nih.gov/taxonomy/?term= sesame
+#	tax_id = "4565"
+#	genus = "Triticum"
+#	species = "aestivum"
+#version="2020.01.06", ### \d+\.\d+
+	print (paste0("### Step7: makeOrgPackage"))
+	my_orgdb <- str_c("org.", str_to_upper(str_sub(genus, 1, 1)) , species, ".eg.db", sep = "")
+	if (file_test("-d", paste(out_dir,"/",my_orgdb))) {
+		unlink(paste(out_dir,"/",my_orgdb) , recursive = TRUE, force = TRUE)
+	}
+	makeOrgPackage(gene_info=gene_info,
+		           go=gene2go,
+		           ko=gene2ko,
+		           pathway=gene2pathway,
+		           maintainer = "Fu-Hao_Lu<lufuhao@henu.edu.cn>",
+		           author = "Fu-Hao_Lu",
+		           version=version,
+		           outputDir = ".",
+		           tax_id=tax_id,
+		           genus=genus,
+		           species=species,
+		           goTable="go")
+	
+	return(my_orgdb)
+}
+
+my_orgdb <- makeOrgPackageFromEmapper(egg_input,
+                                      orgDbVersion,
+                                      tax_id = orgDbTaxid,
+                                      genus = orgDbGenus,
+                                      species = orgDbSpecies)
+
+if (requireNamespace(my_orgdb, quietly = TRUE)) {
+	remove.packages(my_orgdb)
+}
+install.packages(my_orgdb, repos = NULL, type="source")
+
+print (paste0("OrgDB: ", my_orgdb))
+#library(org.Taestivum.eg.db)
+#columns(org.Taestivum.eg.db)
+if (F) {### for test
+	test_geneID="TraesCS1A02G002400.1"
+	gene_info[which(gene_info$GID==test_geneID),]
+	gene2go[which(gene2go$GID==test_geneID),]
+	gene2ko[which(gene2ko$GID==test_geneID),]
+	gene2pathway[which(gene2pathway$GID==test_geneID),]
+	AnnotationDbi::select(org.Taestivum.eg.db, keys = c(test_geneID), columns = c("GENENAME", "GID", "GO", "KO","Pathway"))
+	AnnotationDbi::select(org.Taestivum.eg.db, keys = c(test_geneID), columns = c("GID", "GO", "KO","Pathway")) %>%
+	                      dplyr::select(Pathway, GID)
+	                      na.omit()
+	gene2pathway2 <- gene2ko %>% left_join(ko2pathway, by = "KO") %>% dplyr::select(GID, Pathway) %>% na.omit()
+	pathway2gene[which(pathway2gene$GID==test_geneID),]
+}
+}
+

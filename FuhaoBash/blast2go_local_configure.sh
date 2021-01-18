@@ -295,9 +295,6 @@ fi
 #RS91和RS98匹配到的uniprot基因在GOA文件中会有对应的若干个GO ID，这些GO ID是对该uniprot基因的注释，通过GO ID又可以从GO的OBO文件中提取具体的GO Term术语，即功能注释。因此，从Uniprot的GOA文件中提取GO ID，转而赋给匹配的RS91或RS98的预测基因，通过Perl编程read_GOA.pl脚本实现这一步骤。
 #接着，可以对read_GOA.pl的结果文件进行统计。
 
-
-
-
 # 配置以下7行
 godbname=go_201307-assocdb-data   # 根据http://archive.geneontology.org/latest-full/下assocdb-data.gz文件更改
 dbname=b2gdb                      # 数据库 名称，不用改

@@ -1,0 +1,274 @@
+#!/usr/bin/env Rscript
+
+
+
+################# AUTHORS #########################
+#  Fu-Hao Lu
+#  Post-Doctoral Scientist in Micheal Bevan laboratory
+#  Cell and Developmental Department, John Innes Centre
+#  Norwich NR4 7UH, United Kingdom
+#  E-mail: Fu-Hao.Lu@jic.ac.uk
+packages.required <- c("clusterProfiler" "dplyr" "stringr")
+if (!requireNamespace("BiocManager", quietly = T))
+        install.packages("BiocManager")
+invisible(library("BiocManager", character.only = T, quietly = T, warn.conflicts = FALSE))
+packages.absense <- setdiff(packages.required, rownames(installed.packages()))
+if (length(packages.absense) > 0) {
+	install.packages(packages.absense)
+}
+invisible(lapply(packages.required, function(x) require(x, character.only = T, quietly = T, warn.conflicts = FALSE)))
+
+
+option_list = list(
+#    make_option(c("-f", "--file"), type="logical/integer/double/complex/character", default=NULL, 
+#              action = "store", dest=file, help="Input File[default= %default]", metavar="character"),
+    make_option(c("-f", "--file"), type="character", default=NULL, 
+              action = "store", dest=file, help="Input File[default= %default]", metavar="character"),
+    make_option(c("-o", "--out"), type="character", default="MyOut", 
+              action = "store", dest="out", help="Output File prefix [default= %default]", metavar="PREFIX"),
+    make_option(c("--eps"), type="logical", default=FALSE, 
+              action = "store_true", help="Output EPS [default= %default]", metavar=NULL),
+    make_option(c("--svg"), type="logical", default=FALSE, 
+              action = "store_true", help="Output SVG [default= %default]", metavar=NULL),
+    make_option(c("--tif"), type="logical", default=FALSE, 
+              action = "store_true", help="Output TIFF [default= %default]", metavar=NULL),
+    make_option(c("--pdf"), type="logical", default=FALSE, 
+              action = "store_true", help="Output TIFF [default= %default]", metavar=NULL),
+    make_option(c("--width"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF width (cm) [default= %default]", metavar="float"),
+    make_option(c("--height"), type="double", default=8, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF height (cm) [default= %default]", metavar="float"),
+    make_option(c("--resolution"), type="double", default=600, 
+              action = "store", help="Output TIFF resolution [default= %default]", metavar="float"),
+    make_option(c("--pointsize"), type="double", default=10, 
+              action = "store", help="Output TIFF/SVG/EPS/PDF [default= %default]", metavar="float"),
+    make_option(c("--family"), type="character", default="ArialMT", 
+              action = "store", help="Output TIFF/SVG/EPS/PDF font family [default= %default]", metavar="character"),
+    make_option(c("--verbose"), type="logical", default=FALSE, 
+              action = "store_true", help="Print detailed info [default= %default]", metavar=NULL)
+  );
+
+#opt = parse_args(OptionParser(option_list=option_list, usage = "This Script is a test for arguments!"))
+opt_parser=OptionParser(option_list=option_list, usage = "This Script is  to display blast results!")
+opt = parse_args(opt_parser)
+
+if (is.null(opt$file)){
+	print_help(opt_parser)
+	stop("Error: invalid input file", call.=FALSE)
+}
+if (is.null(opt$outtable)){opt$outtable=paste(opt$file,'.xls',sep='')}
+if (is.null(opt$outpdf)){opt$outpdf=paste(opt$file,'.pdf',sep='')}
+
+
+################# input and output #########################
+print (paste0("Input File: ", opt$file))
+print (paste0("Output File: ", opt$out))
+
+if (opt$svg) {
+	svg(filename=paste(fig.out.pfx, ".svg", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, bg = "white", family=opt$family)
+	My.Plot
+	dev.off()
+}
+if (opt$pdf) {
+	pdf(file=paste(fig.out.pfx, ".pdf", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	My.Plot
+	dev.off()
+}
+if (opt$tif) {
+	tiff(filename = paste(fig.out.pfx, ".tif", sep=""), width=opt$width, height=opt$height, units = "cm", pointsize=opt$pointsize, compression = "lzw", bg = "white", res=opt$resolution, family=opt$family)
+	My.Plot
+	dev.off()
+}
+if (opt$eps) {
+	setEPS()
+	postscript(paste(fig.out.pfx, ".eps", sep=""), width=opt$width/cm(1), height=opt$height/cm(1), pointsize=opt$pointsize, family=opt$family, bg = "white")
+	My.Plot
+	dev.off()
+}
+
+
+
+options(stringsAsFactors = F)
+opt$file="wheat.v1.eggnog.annotations"
+egg_input="wheat.v1.eggnog.annotations"
+opt$dir="/home/lufuhao/Desktop"
+out_dir="/home/lufuhao/Desktop"
+outPfx="wheat.v1.eggnog"
+
+
+
+### https://www.jianshu.com/p/bb4281e6604e
+### https://cloud.tencent.com/developer/article/1607669
+### https://sr-c.github.io/2018/12/01/clusterProfiler/
+### https://my.oschina.net/u/4339825/blog/3318886
+# 需要下载 json文件(这是是经常更新的)
+# https://www.genome.jp/kegg-bin/get_htext?ko00001
+# 代码来自：http://www.genek.tv/course/225/task/4861/show
+library(jsonlite)
+library(purrr)
+library(RCurl)
+
+update_kegg <- function(json = "ko00001.json") {
+
+	pathway2name <- tibble(Pathway = character(), Name = character())
+	ko2pathway <- tibble(KO = character(), Pathway = character())
+
+	kegg <- fromJSON(json)
+
+	for (a in seq_along(kegg[["children"]][["children"]])) {
+		A <- kegg[["children"]][["name"]][[a]]
+
+		for (b in seq_along(kegg[["children"]][["children"]][[a]][["children"]])) {
+			B <- kegg[["children"]][["children"]][[a]][["name"]][[b]] 
+
+			for (c in seq_along(kegg[["children"]][["children"]][[a]][["children"]][[b]][["children"]])) {
+				pathway_info <- kegg[["children"]][["children"]][[a]][["children"]][[b]][["name"]][[c]]
+
+				pathway_id <- str_match(pathway_info, "ko[0-9]{5}")[1]
+				pathway_name <- str_replace(pathway_info, " \\[PATH:ko[0-9]{5}\\]", "") %>% str_replace("[0-9]{5} ", "")
+				pathway2name <- rbind(pathway2name, tibble(Pathway = pathway_id, Name = pathway_name))
+
+				kos_info <- kegg[["children"]][["children"]][[a]][["children"]][[b]][["children"]][[c]][["name"]]
+
+				kos <- str_match(kos_info, "K[0-9]*")[,1]
+
+				ko2pathway <- rbind(ko2pathway, tibble(KO = kos, Pathway = rep(pathway_id, length(kos))))
+			}
+		}
+	}
+	colnames(ko2pathway)=c("KO", "Pathway")
+	save(pathway2name, ko2pathway, file = "pathway2name.kegg_info.RData")
+	return(ko2pathway)
+}
+makeOrgPackageFromEmapper <- function(f_emapper_anno, 
+                                      author, 
+                                      tax_id = "0", 
+                                      genus = "default", 
+                                      species = "default") {
+	### STEP1: 自己构建的话，首先需要读入文件
+	setwd(out_dir)
+	#na.strings = "", comment.char = "", check.names = FALSE
+	egg <- read.table(egg_input, sep = "\t", quote=NULL, header=T)
+	### 文件共有22列
+	### 2. seed eggNOG ortholog 在eggnog中比对到的最佳结果
+
+	#这个代码来自花花的指导(将空行变成NA，方便下面的去除)
+	egg[egg==""]<-NA
+	head(egg)
+
+
+	### STEP2: 从文件中挑出基因query_name与eggnog注释信息
+	#gene_info <- egg %>% dplyr::select(GID = query_name, GENENAME = eggNOG_annot) %>% na.omit()
+	gene_info <- egg %>% dplyr::select(GID = query_name, GENENAME = seed_eggNOG_ortholog) %>% na.omit()
+
+
+
+	### STEP3-1：挑出query_name与GO注释信息
+	gterms <- egg %>% dplyr::select(query_name, GOs) %>% na.omit()
+
+	### STEP3-2：我们想得到query_name与GO号的对应信息
+	### 先构建一个空的数据框(弄好大体的架构，表示其中要有GID =》query_name，GO =》GO号， EVIDENCE =》默认IDA)
+	### 关于IEA：就是一个标准，除了这个标准以外还有许多。IEA就是表示我们的注释是自动注释，无需人工检查http://wiki.geneontology.org/index.php/Inferred_from_Electronic_Annotation_(IEA)
+	### 两种情况下需要用IEA：
+	### 1. manually constructed mappings between external classification systems and GO terms;
+	### 2.automatic transfer of annotation to orthologous gene products.
+	gene2go <- data.frame(GID = character(), GO = character(), EVIDENCE = character())
+
+	### 然后向其中填充：注意到有的query_name对应多个GO，因此我们以GO号为标准，每一行只能有一个GO号，但query_name和Evidence可以重复
+	for (row in 1:nrow(gterms)) {
+		print (gterms[row, ])
+		gene_terms <- str_split(gterms[row,"GOs"], ",", simplify = FALSE)[[1]]
+		gene_id <- gterms[row, "query_name"][[1]]
+		tmp <- data_frame(GID = rep(gene_id, length(gene_terms)),
+		                GO = gene_terms,
+		                EVIDENCE = rep("IEA", length(gene_terms)))
+	  gene2go <- rbind(gene2go, tmp)
+	}
+	gene2go<-gene2go[!duplicated(gene2go),]
+	write.table(gene2go,file = paste0(outPfx, ".gene2go.tab"), sep="\t", quote=F, row.names=T, col.names=T)
+	system(paste("sed -i '1 s/^/ID\t/'", paste0(outPfx, ".gene2go.tab")))
+	save(gene2go, file = paste0(outPfx, ".gene2go.Rdata"))
+	#gene2go <- read.table(paste0(outPfx, ".gene2go.tab"), sep = "\t", , header=T)
+
+
+	### STEP4-1: 挑出query_name与KEGG注释信息
+	kterms <- egg %>% dplyr::select(query_name, KEGG_ko) %>% na.omit()
+	gene2ko <- data.frame(GID = character(), KO = character())
+	for (row in 1:nrow(kterms)) {
+		print (kterms[row, ])
+		ko_terms <- str_split(kterms[row,"KEGG_ko"], ",", simplify = FALSE)[[1]]
+		for (indnum in 1:length(ko_terms)) {
+			ko_terms[indnum]<-gsub("^ko:", "", ko_terms[indnum])
+		}
+		gene_id <- kterms[row, "query_name"][[1]]
+		tmp <- data_frame(GID = rep(gene_id, length(ko_terms)), KO = ko_terms)
+		
+		gene2ko <- rbind(gene2ko, tmp)
+	}
+	colnames(gene2ko)=c("GID", "KO")
+	
+## OR
+#	gene2ko <- egg %>% dplyr::select(GID = query_name, KO = KEGG_ko) %>% na.omit()
+	head(gene2ko)
+
+	gene2ko<-gene2ko[!duplicated(gene2ko),]
+	write.table(gene2ko,file = paste0(outPfx, ".gene2ko.tab"), sep="\t", quote=F, row.names=T, col.names=T)
+	system(paste("sed -i '1 s/^/ID\t/'", paste0(outPfx, ".gene2ko.tab")))
+	save(gene2ko, file = paste0(outPfx, ".gene2ko.Rdata"))
+	#gene2ko <- read.table(paste0(outPfx, ".gene2ko.tab"), sep = "\t", , header=T)
+
+
+	### STEP4-2: 得到ko2pathway
+	ko2pathway <- update_kegg(json = "ko00001.json")
+	#load(file = "pathway2name.kegg_info.RData")
+	head(ko2pathway)
+	
+	
+	### STEP5: 利用GO将gene与pathway联系起来，然后挑出query_name与pathway注释信息
+	gene2pathway <- gene2ko %>% left_join(ko2pathway, by = "KO") %>% dplyr::select(GID, Pathway) %>% na.omit()
+	gene2pathway<-gene2pathway[!duplicated(gene2pathway),]
+	head(gene2pathway)
+
+
+	library(AnnotationForge)
+	library(RSQLite)
+	library(DBI)
+	### STEP6: 制作自己的Orgdb
+	### 查询物种的Taxonomy，例如要查sesame
+	### https://www.ncbi.nlm.nih.gov/taxonomy/?term= sesame
+#	tax_id = "4565"
+#	genus = "Triticum"
+#	species = "aestivum"
+	
+	#gene2go <- unique(gene2go)
+#version="2020.01.06", ### \d+\.\d+
+	makeOrgPackage(gene_info=gene_info,
+		           go=gene2go,
+		           ko=gene2ko,
+		           pathway=gene2pathway,
+		           maintainer = "Fu-Hao_Lu<lufuhao@henu.edu.cn>",
+		           author = "Fu-Hao_Lu",
+		           
+		           version="2020.01.06",
+		           outputDir = ".",
+		           tax_id=tax_id,
+		           genus=genus,
+		           species=species,
+		           goTable="go")
+	my_orgdb <- str_c("org.", str_to_upper(str_sub(genus, 1, 1)) , species, ".eg.db", sep = "")
+	return(my_orgdb)
+}
+
+my_orgdb <- makeOrgPackageFromEmapper(egg_input, 
+                                      "Fu-Hao_Lu<lufuhao@henu.edu.cn>", 
+                                      tax_id = "4565", 
+                                      genus = "Triticum", 
+                                      species = "aestivum")
+
+if (requireNamespace(my_orgdb, quietly = TRUE))
+  remove.packages(my_orgdb)
+install.packages(my_orgdb, repos = NULL, type="source")
+
+library(org.Taestivum.eg.db)
+columns(org.Taestivum.eg.db)
+
