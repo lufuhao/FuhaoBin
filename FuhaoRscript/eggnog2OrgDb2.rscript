@@ -334,6 +334,10 @@ print (paste0("OrgDB: ", my_orgdb))
 #library(org.Taestivum.eg.db)
 #columns(org.Taestivum.eg.db)
 if (F) {### for test
+	keytypes(org.Taestivum.eg.db)
+	columns(org.Taestivum.eg.db)
+#	keys(org.Taestivum.eg.db, keytype="PATH") %>% head()
+#	keys(org.Taestivum.eg.db, keytype="SYMBOL") %>% head()
 	test_geneID="TraesCS1A02G002400.1"
 	gene_info[which(gene_info$GID==test_geneID),]
 	gene2go[which(gene2go$GID==test_geneID),]
