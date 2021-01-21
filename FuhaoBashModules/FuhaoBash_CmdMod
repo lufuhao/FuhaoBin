@@ -15,6 +15,19 @@
 #  E-mail: Fu-Hao.Lu@jic.ac.uk
 
 
+###echo color
+#Black        0;30     Dark Gray     1;30
+#Red          0;31     Light Red     1;31
+#Green        0;32     Light Green   1;32
+#Brown/Orange 0;33     Yellow        1;33
+#Blue         0;34     Light Blue    1;34
+#Purple       0;35     Light Purple  1;35
+#Cyan         0;36     Light Cyan    1;36
+#Light Gray   0;37     White         1;37
+#RED='\033[0;31m'
+#NC='\033[0m' # No Color
+#printf "I ${RED}love${NC} Stack Overflow\n"
+
 
 
 #$ command -v foo >/dev/null 2>&1 || { echo >&2 "I require foo but it's not installed.  Aborting."; exit 1; }  
@@ -22,13 +35,13 @@
 #$ hash foo 2>/dev/null || { echo >&2 "I require foo but it's not installed.  Aborting."; exit 1; } 
 
 ###Detect command existence
-CmdExists2 () {
-  if command -v $1 >/dev/null 2>&1; then
-    return 0
-  else
+#CmdExists2 () {
+#  if command -v $1 >/dev/null 2>&1; then
+#    return 0
+#  else
 #    echo "I require $1 but it's not installed.  Aborting." >&2
-    return 1
-  fi
+#    return 1
+#  fi
 #  local cmd=$1
 #  if command -v $cmd >/dev/null 2>&1;then
 #    echo >&2 $cmd "  :  "`command -v $cmd`
@@ -37,7 +50,7 @@ CmdExists2 () {
 #    echo >&2 "Error: require $cmd but it's not installed.  Exiting..."
 #    exit 1
 #  fi
-}
+#}
 ###Example:
 #if [ $(CmdExists 'sanmtools') -eq 0 ]; then
 #	exit 0
@@ -53,16 +66,85 @@ CmdExists2 () {
 
 ###Detect command existence
 CmdExists () {
-  if command -v $1 >/dev/null 2>&1; then
-    return 0;
-  else
-    return 1;
-  fi
+	if command -v $1 >/dev/null 2>&1; then
+		return 0;
+	else
+		return 1;
+	fi
+}
+CmdExit () {
+	if command -v $1 >/dev/null 2>&1; then
+		return 0;
+	else
+		echo "Error: cmd not found: $1"
+		exit 100
+	fi
 }
 ### Detect command existence
-LibExists() {
-	local CCarr=("$@")
+printMsg () {
+	echo "$1"
+	echo "$1" >&2
+}
+function sysLibExist {
+	local -a LElibname=("$@")
 	
-#	foreach 
-	return 0;
+	for IndLib in "${LElibname[@]}"; do
+		if ldconfig -p | grep "$IndLib"; then
+			PrintInfo "Info: required LIB detected: $IndLib"
+		else
+			PrintError "Error: required LIB NOT found: $IndLib"
+			exit 100
+		fi
+	done
+	
+	return 0
+}
+function softExist {
+	local -a SElibname=("$@")
+	
+	for IndLib in "${SElibname[@]}"; do
+		if dpkg -l "$IndLib"; then
+			PrintInfo "Info: required package detected: $IndLib"
+		else
+			PrintError "Error: required package NOT found: $IndLib"
+			exit 100
+		fi
+	done
+	
+	return 0
+}
+function perlLibExist {
+	local -a PMElibname=("$@")
+	local PMEtest_not_install=0;
+	
+	for PMEIndLib in "${SElibname[@]}"; do
+		if perl -M$PMEIndLib -e ';' > /dev/null 2>&1; then
+			PrintInfo "Info: required Perl Module detected: $PMEIndLib"
+		else
+			PrintError "Error: required Perl Module NOT found: $PMEIndLib"
+			PMEtest_not_install=1
+		fi
+	done
+	
+	if [ $PMEtest_not_install -eq 0 ]; then
+		return 0
+	else
+		exit 100
+	fi
+}
+### Find Python Libs
+function pythonLibExist {
+	local FPLpath=$1
+	
+	local FPLLibs=($(find $FPLpath -type d -name 'site-packages'))
+	if [ ${#FPLLibs[@]} -eq 1 ] && [ -d "${FPLLibs[0]}" ]; then
+		PythonLibPath=${FPLLibs[0]}
+		return 0
+	elif [ ${#FPLLibs[@]} -lt 1 ]; then
+		PrintError "Error: Python Lib not found under $FPLpath"
+		exit 100
+	elif [ ${#FPLLibs[@]} -gt 1 ]; then
+		PrintError "Error: Multiple Python Lib found under $FPLpath"
+		exit 100
+	fi
 }

@@ -15,9 +15,11 @@
 
 
 ### Return full path of a file or folder
+###--------------------------- method1 -----------------------------------
 abs2rel () {
 	perl -MFile::Spec -e 'print(File::Spec->abs2rel($ARGV[1], $ARGV[0]), "\n")' "$@";
 }
+###--------------------------- method2 -----------------------------------
 function fullpath() {
     # generate absolute path from relative path
     # $1     : relative filename
@@ -34,16 +36,21 @@ function fullpath() {
         fi
     fi
 }
+###--------------------------- method3 -----------------------------------
 abspath () { case "$1" in /*)printf "%s\n" "$1";; *)printf "%s\n" "$PWD/$1";; esac; }
+###--------------------------- method4 -----------------------------------
 #for zsh only
 #realpath() { for f in "$@"; do echo ${f}(:A); done }
+###--------------------------- method5 -----------------------------------
 echo `cd "$1" 2>/dev/null&&pwd||(cd "$(dirname "$1")";pwd|sed "s|/*\$|/${1##*/}|")`
+###--------------------------- method6 -----------------------------------
 fp () {
   case "$1" in
     /*) printf '%s\n' "$1";;
     *) printf '%s\n' "$PWD/$1";;
   esac
 }
+###--------------------------- method7 -----------------------------------
 rel2abs () {
 	
 	for RAfile in $@; do
@@ -52,9 +59,9 @@ rel2abs () {
 	done
 
 }
+###--------------------------- method8 -----------------------------------
 #rel2abs () { perl -MFile::Spec -e \'print(File::Spec->rel2abs($ARGV[0]), "\n")\' "$@"; }
-
-
+###--------------------------- method9 -----------------------------------
 File2Fullpath () {
 	local FFinput=$1
 	local FFsubinfo="SUF(File2Fullpath)"
@@ -77,3 +84,9 @@ File2Fullpath () {
 	fi
 #	echo "#Test6: $FFinput #" >&2
 }
+###--------------------------- method10 -----------------------------------
+readlink -f /foo/bar/baz
+readlink -e /foo/bar/baz
+readlink -m /foo/bar/baz
+###--------------------------- method11 -----------------------------------
+realpath
