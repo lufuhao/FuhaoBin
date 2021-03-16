@@ -55,7 +55,7 @@ while (my $line=<MASKED>) {
 		my @arr1=split(//, $line);
 		for (my $i=0; $i<scalar(@arr1); $i++) {
 			$basenum++;
-			if ($arr1[$i] eq 'N') {
+			if ($arr1[$i] =~/^[nN]$/) {
 				if ($test_start==0) {
 					$start=$basenum;
 					$test_start=1;
