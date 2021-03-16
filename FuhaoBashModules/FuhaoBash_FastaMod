@@ -118,3 +118,17 @@ SeqTkSubSeqFasta () {
 
 	return 0;
 }
+
+fastaIndex () {
+	local FIfa=$1
+	
+	if [ ! -s "$FIfa.fai" ]; then
+		samtools faidx $FIfa
+		if [ $? -ne 0 ]; then
+			echo "Error: samtools faidx running error: $FIfa" >&2
+			exit 100
+		fi
+	fi
+	
+	return 0
+}
