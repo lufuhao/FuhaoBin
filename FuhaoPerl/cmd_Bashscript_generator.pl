@@ -91,7 +91,7 @@ opt_t=1
 while [ -n "$1" ]; do
   case "$1" in
     -h) help;shift 1;;
-    -i) FastQR1Arr=($(echo $2 | tr ',' "\n"));shift 2;;
+    -i) FastQR1Arr=($(echo $2 | tr \',\' "\n"));shift 2;;
     -t) opt_t=$2;shift 2;;
     -1) seq_rfn=(${seq_rfn[@]} "$2");shift 2;;
     -s) opt_s=1;shift 1;;
