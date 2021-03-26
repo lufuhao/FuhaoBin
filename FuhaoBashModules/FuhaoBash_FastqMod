@@ -25,7 +25,10 @@ FastQCheck () {
 	FQCfastq=$1
 	FQCoptions=$2
 	
-	fastqc $FQCfastq -f fastq -t $numthreads --noextract $FQCoptions
+	if [ -z "$FQCoptions" ]; then
+		FQCoptions=" -o $PWD/nogroup -t 1  --noextract --nogroup"
+	fi
+	fastqc $FQCfastq -f fastq $FQCoptions
 	if [ $? -ne 0 ]; then
 		return 100;
 	fi
@@ -110,7 +113,12 @@ RunTrimGalore () {
 		if [ ! -d $RTGoutdir1/nogroup ]; then
 			mkdir -p $RTGoutdir1/nogroup
 		fi
-		fastqc $RTGfqout1 -o $RTGoutdir1/nogroup -f fastq -t $RTGnumthreads --noextract --nogroup
+		if FastQCheck $RTGfqout1 " -o $RTGoutdir1/nogroup -t $RTGnumthreads  --noextract --nogroup"; then
+			echo "Info: fastqc succeeded: $RTGfqout1"
+		else
+			echo "Error: fastqc failed: $RTGfqout1" >&2
+			return 100
+		fi
 	else
 		return 100
 	fi
@@ -125,7 +133,12 @@ RunTrimGalore () {
 		if [ ! -d $RTGoutdir2/nogroup ]; then
 			mkdir -p $RTGoutdir2/nogroup
 		fi
-		fastqc $RTGfqout2 -o $RTGoutdir2/nogroup -f fastq -t $RTGnumthreads --noextract --nogroup
+		if FastQCheck $RTGfqout2 " -o $RTGoutdir2/nogroup -t $RTGnumthreads  --noextract --nogroup"; then
+			echo "Info: fastqc succeeded: $RTGfqout2"
+		else
+			echo "Error: fastqc failed: $RTGfqout2" >&2
+			return 100
+		fi
 	else
 		return 100
 	fi
@@ -213,24 +226,26 @@ RunTrimmomatic () {
 	fi
 
 	if [ -s $RMoutfq1_paired ]; then
-		if [ ! -d $RMpathdir1/group ]; then
-			mkdir -p $RMpathdir1/group
+		if [ ! -d $RMpathdir1/nogroup ]; then
+			mkdir -p $RMpathdir1/nogroup
 		fi
-		fastqc $RMoutfq1_paired -o $RMpathdir1/group -f fastq -t $RMnumthreads --noextract
-#		if [ ! -d $RMpathdir1/nogroup ]; then
-#			mkdir -p $RMpathdir1/nogroup
-#		fi
-#		fastqc $RMoutfq1_paired -o $RMpathdir1/nogroup -f fastq -t $RMnumthreads --noextract --nogroup
+		if FastQCheck $RMoutfq1_paired " -o $RMpathdir1/nogroup -t $RMnumthreads  --noextract --nogroup"; then
+			echo "Info: fastqc succeeded: $RMoutfq1_paired"
+		else
+			echo "Error: fastqc failed: $RMoutfq1_paired" >&2
+			return 100
+		fi
 	fi
 	if [ -s $RMoutfq2_paired ]; then
-		if [ ! -d $RMpathdir2/group ]; then
-			mkdir -p $RMpathdir2/group
+		if [ ! -d $RMpathdir2/nogroup ]; then
+			mkdir -p $RMpathdir2/nogroup
 		fi
-		fastqc $RMoutfq2_paired -o $RMpathdir2/group -f fastq -t $RMnumthreads --noextract
-#		if [ ! -d $RMpathdir2/nogroup ]; then
-#			mkdir -p $RMpathdir2/nogroup
-#		fi
-#		fastqc $RMoutfq2_paired -o $RMpathdir2/nogroup -f fastq -t $RMnumthreads --noextract --nogroup
+		if FastQCheck $RMoutfq2_paired " -o $RMpathdir2/nogroup -t $RMnumthreads  --noextract --nogroup"; then
+			echo "Info: fastqc succeeded: $RMoutfq2_paired"
+		else
+			echo "Error: fastqc failed: $RMoutfq2_paired" >&2
+			return 100
+		fi
 	fi
 
 	return 0
@@ -297,24 +312,26 @@ RunTrimmomatic2 () {
 		ILLUMINACLIP:"$RMfile_adaptor":2:30:10 LEADING:$RMmin_qual TRAILING:$RMmin_qual SLIDINGWINDOW:4:$RMmin_qual MINLEN:$RMmin_len
 
 	if [ -s $RMoutfq1_paired ]; then
-		if [ ! -d $RMpathdir1/group ]; then
-			mkdir -p $RMpathdir1/group
+		if [ ! -d $RMpathdir1/nogroup ]; then
+			mkdir -p $RMpathdir1/nogroup
 		fi
-		fastqc $RMoutfq1_paired -o $RMpathdir1/group -f fastq -t $RMnumthreads --noextract
-#		if [ ! -d $RMpathdir1/nogroup ]; then
-#			mkdir -p $RMpathdir1/nogroup
-#		fi
-#		fastqc $RMoutfq1_paired -o $RMpathdir1/nogroup -f fastq -t $RMnumthreads --noextract --nogroup
+		if FastQCheck $RMoutfq1_paired " -o $RMpathdir1/nogroup -t $RMnumthreads  --noextract --nogroup"; then
+			echo "Info: fastqc succeeded: $RMoutfq1_paired"
+		else
+			echo "Error: fastqc failed: $RMoutfq1_paired" >&2
+			return 100
+		fi
 	fi
 	if [ -s $RMoutfq2_paired ]; then
-		if [ ! -d $RMpathdir2/group ]; then
-			mkdir -p $RMpathdir2/group
+		if [ ! -d $RMpathdir2/nogroup ]; then
+			mkdir -p $RMpathdir2/nogroup
 		fi
-		fastqc $RMoutfq2_paired -o $RMpathdir2/group -f fastq -t $RMnumthreads --noextract
-#		if [ ! -d $RMpathdir2/nogroup ]; then
-#			mkdir -p $RMpathdir2/nogroup
-#		fi
-#		fastqc $RMoutfq2_paired -o $RMpathdir2/nogroup -f fastq -t $RMnumthreads --noextract --nogroup
+		if FastQCheck $RMoutfq2_paired " -o $RMpathdir2/nogroup -t $RMnumthreads  --noextract --nogroup"; then
+			echo "Info: fastqc succeeded: $RMoutfq2_paired"
+		else
+			echo "Error: fastqc failed: $RMoutfq2_paired" >&2
+			return 100
+		fi
 	fi
 
 	return 0
@@ -383,24 +400,26 @@ RunFastp () {
 	fi
 
 	if [ -s $RFoutfq1_paired ]; then
-		if [ ! -d $RFpathdir1/group ]; then
-			mkdir -p $RFpathdir1/group
+		if [ ! -d $RFpathdir1/nogroup ]; then
+			mkdir -p $RFpathdir1/nogroup
 		fi
-		fastqc $RFoutfq1_paired -o $RFpathdir1/group -f fastq -t $RFnumthreads --noextract
-#		if [ ! -d $RFpathdir1/nogroup ]; then
-#			mkdir -p $RFpathdir1/nogroup
-#		fi
-#		fastqc $RFoutfq1_paired -o $RFpathdir1/nogroup -f fastq -t $RFnumthreads --noextract --nogroup
+		if FastQCheck $RFoutfq1_paired " -o $RFpathdir1/nogroup -t $RFnumthreads  --noextract --nogroup"; then
+			echo "Info: fastqc succeeded: $RFoutfq1_paired"
+		else
+			echo "Error: fastqc failed: $RFoutfq1_paired" >&2
+			return 100
+		fi
 	fi
 	if [ -s $RFoutfq2_paired ]; then
-		if [ ! -d $RFpathdir2/group ]; then
-			mkdir -p $RFpathdir2/group
+		if [ ! -d $RFpathdir2/nogroup ]; then
+			mkdir -p $RFpathdir2/nogroup
 		fi
-		fastqc $RFoutfq2_paired -o $RFpathdir2/group -f fastq -t $RFnumthreads --noextract
-#		if [ ! -d $RFpathdir2/nogroup ]; then
-#			mkdir -p $RFpathdir2/nogroup
-#		fi
-#		fastqc $RFoutfq2_paired -o $RFpathdir2/nogroup -f fastq -t $RFnumthreads --noextract --nogroup
+		if FastQCheck $RFoutfq2_paired " -o $RFpathdir2/nogroup -t $RFnumthreads  --noextract --nogroup"; then
+			echo "Info: fastqc succeeded: $RFoutfq2_paired"
+		else
+			echo "Error: fastqc failed: $RFoutfq2_paired" >&2
+			return 100
+		fi
 	fi
 
 	return 0
