@@ -47,7 +47,7 @@ cat<<HELP
 
 $0 --- Brief Introduction
 
-Version: v20210420
+Version: v20200320
 
 Requirements:
 	perl && File::Spec
@@ -88,17 +88,45 @@ opt_s=0
 opt_a=0
 opt_t=1
 #################### Parameters #####################################
-while [ -n "$1" ]; do
+while [[ $# -gt 0 ]]; do
+  key="$1"
+
   case "$1" in
-    -h) help;shift 1;;
-    -i) FastQR1Arr=($(echo $2 | tr \',\' "\n"));shift 2;;
-    -t) opt_t=$2;shift 2;;
-    -1) seq_rfn=(${seq_rfn[@]} "$2");shift 2;;
-    -s) opt_s=1;shift 1;;
-    -a) opt_a=1;shift 1;;
-    --) shift;break;;
-    -*) echo "error: no such option $1. -h for help" > /dev/stderr;exit 1;;
-    *) break;;
+    -h|--help)
+      help
+      shift
+      ;;
+    -i|--input)
+      FastQR1Arr=($(echo $2 | tr \',\' "\n"))
+      shift 2
+      ;;
+    -t|--threads)
+      opt_t=$2
+      shift 2
+      ;;
+    -1)
+      seq_rfn=(${seq_rfn[@]} "$2")
+      shift 2
+      ;;
+    -s)
+      opt_s=1
+      shift
+      ;;
+    -a)
+      opt_a=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "Error: no such option $1. -h for help" > /dev/stderr
+      exit 1
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
