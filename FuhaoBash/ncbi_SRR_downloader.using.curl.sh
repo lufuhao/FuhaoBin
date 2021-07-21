@@ -112,7 +112,7 @@ CmdExists () {
   fi
 }
 SrrDownloadUsingCurl() {
-	local $SDUCsrr=$1
+	local SDUCsrr=$1
 	
 	local SDUCsub="(SrrDownloadUsingCurl)"
 	# Create the full path to the file.

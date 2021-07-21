@@ -1,6 +1,6 @@
 #!/bin/bash
 ### Source: http://data.biostarhandbook.com/scripts/wonderdump.sh
-set -ue
+#set -ue
 ### Exit if command fails
 #set -o errexit
 ### Set readonly variable
@@ -117,8 +117,8 @@ CmdExists () {
 
 
 
-SrrDownloadUsingAscp() {
-	local $SDUCsrr=$1
+SrrDownloadUsingPrefetch() {
+	local SDUCsrr=$1
 	
 	local SDUCsub="(SrrDownloadUsingCurl)"
 	# Create the full path to the file.
@@ -137,8 +137,8 @@ SrrDownloadUsingAscp() {
 		echo "($SDUCsub)Info: Saving to: $Sra_File"
 		prefetch $opt_n -O $opt_d --output-file $Tmp_File $SDUCsrr > $Sra_File.prefetch.log 2>&1
 		if [ $? -ne 0 ]; then
-			echo "($SDUCsub)Error: ascp failed to download SRR: $SDUCsrr" >&2
-			echo "($SDUCsub)Error: CMD used: ascp $opt_n $URL $opt_d" >&2
+			echo "($SDUCsub)Error: prefetch failed to download SRR: $SDUCsrr" >&2
+			echo "($SDUCsub)Error: CMD used: prefetch $opt_n -O $opt_d --output-file $Tmp_File $SDUCsrr > $Sra_File.prefetch.log 2>&1" >&2
 			return 100;
 		else # Move to local file only if successful.
 			mv $Tmp_File $Sra_File
@@ -152,28 +152,14 @@ SrrDownloadUsingAscp() {
 
 	return 0
 }
-###ascp的用法：ascp [参数] 目标文件 目标地址，在线文档
-#-v verbose mode 唠叨模式，能让你实时知道程序在干啥，方便查错。有些作者的程序缺乏人性化，运行之后，只见光标闪，压根不知道运行到哪了
-#-T 取消加密，否则有时候数据下载不了
-#-i 提供私钥文件的地址，地址一般是$HOME/.aspera/connect/etc/asperaweb_id_dsa.openssh文件
-#-l 设置最大传输速度，一般200m到500m，如果不设置，反而速度会比较低，可能有个较低的默认值
-#-k 断点续传，一般设置为值1
-#-Q 不懂，一般加上它
-#-P 提供SSH port，一般是33001，反正我不懂
 
-### SRA数据库下载
-#首先记住，数据的存放地址是ftp-private.ncbi.nlm.nih.gov，SRA在Aspera的用户名是anonftp，下载举例：
-#如果我想下载SRR949627.sra文件，首先我需要找到地址，去ncbi ftp-private或者ncbi faspftp，一层层寻找，直至找到，然后记下链接地址，就可以开始下载了：
-#ascp -v -i ~/.aspera/connect/etc/asperaweb_id_dsa.openssh -k 1 -T -l200m anonftp@ftp-private.ncbi.nlm.nih.gov:/sra/sra-instant/reads/ByRun/sra/SRR/SRR949/SRR949627/SRR949627.sra ~/biostar/aspera/
-#    注意：anonftp@ftp-private.ncbi.nlm.nih.gov后面是:号，不是路径/！
-#    一般来说，NCBI的sra文件前面的地址都是一样的/sra/sra-instant/reads/ByRun/sra/SRR/...，那么写脚本批量下载也就不难了！
 
 
 
 #################### Command test ###################################
-CmdExists 'ascp'
+CmdExists 'prefetch'
 if [ $? -ne 0 ]; then
-	echo "Error: CMD 'ascp' in PROGRAM 'Aspera Connect' is required but not found.  Aborting..." >&2 
+	echo "Error: CMD 'prefetch' in PROGRAM 'SRAtoolkit' is required but not found.  Aborting..." >&2 
 	exit 127
 fi
 
@@ -200,7 +186,7 @@ if [ ! -z "$opt_f" ] && [ -s "$opt_f" ]; then
 	echo ""
 	while read SrrID; do
 		echo "###     SRR: $SrrID"
-		if SrrDownloadUsingAscp $SrrID; then
+		if SrrDownloadUsingPrefetch $SrrID; then
 			echo "###     SRR: $SrrID    OK"
 		else
 			echo "###     SRR: $SrrID    failed" >&2
@@ -214,7 +200,7 @@ if [[ ${SRRlist[@]} -gt 0 ]]; then
 	echo ""
 	for SrrID in ${SRRlist[@]}; do
 		echo "###     SRR: $SrrID"
-		if SrrDownloadUsingAscp $SrrID; then
+		if SrrDownloadUsingPrefetch $SrrID; then
 			echo "###     SRR: $SrrID    OK"
 		else
 			echo "###     SRR: $SrrID    failed" >&2
