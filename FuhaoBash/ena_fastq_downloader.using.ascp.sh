@@ -1,6 +1,6 @@
 #!/bin/bash
 ### Source: http://data.biostarhandbook.com/scripts/wonderdump.sh
-set -ue
+#set -ue
 ### Exit if command fails
 #set -o errexit
 ### Set readonly variable
@@ -119,7 +119,7 @@ CmdExists () {
 
 
 SrrDownloadUsingAscp() {
-	local $SDUCsrr=$1
+	local SDUCsrr=$1
 	
 	local SDUCsub="(SrrDownloadUsingCurl)"
 	# Create the full path to the file.
