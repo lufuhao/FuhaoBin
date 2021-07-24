@@ -230,7 +230,7 @@ if [ ! -z "$opt_f" ] && [ -s "$opt_f" ]; then
 	done < $opt_f
 fi
 
-if [[ ${SRRlist[@]} -gt 0 ]]; then
+if [[ ${#SRRlist[@]} -gt 0 ]]; then
 	echo ""
 	echo "### Using SRR comma list"
 	echo ""
