@@ -251,6 +251,7 @@ RunTrimmomatic () {
 	return 0
 }
 ### run trimmomatic using classpath
+### RunTrimmomatic2 in1.fq.gz in2.fq.gz out1.fq.gz out2.fq.gz out.prefix in.adaptor min.qual min.len num_threads
 RunTrimmomatic2 () {
 	local RMr1=$1
 	local RMr2=$2
