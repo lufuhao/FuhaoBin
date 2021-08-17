@@ -84,7 +84,7 @@ declare -a bamlist1=()
 declare -a bamlist2=()
 declare -a bamAll=()
 opt_t=1
-opt_o=""
+opt_o="samtools.flagstat.tab"
 #################### Parameters #####################################
 while [ -n "$1" ]; do
   case "$1" in
@@ -146,7 +146,7 @@ if [ -e "$opt_o" ]; then
 	exit 100
 fi
 
-if [[ "$opt_t" =~ [0-9]+ ]]; then
+if [[ "$opt_t" =~ [0-9]+ ]] && [ $opt_t -gt 1 ]; then
 	sam_flagstat_option=" --threads $opt_t "
 fi
 
