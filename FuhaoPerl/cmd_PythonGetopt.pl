@@ -57,6 +57,6 @@ if __name__ == '__main__':
 EOP
 
 
-print "#!/usr/bin/env Rscript\n";
+print "#!/usr/bin/env python3\n";
 print AUTHORINFO;
 print HELPOPT;
